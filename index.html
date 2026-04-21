@@ -1,0 +1,1229 @@
+import React, { useState, useMemo } from 'react';
+
+// ============ BENCHMARK DATA ============
+const BENCHMARKS = {
+  webinar: {
+    cpm: { critical: 60, poor: 45, average: 30, good: 20, elite: 0, inverse: true, label: 'CPM', format: '$' },
+    lctr: { critical: 0.7, poor: 1.2, average: 1.8, good: 2.5, elite: 100, label: 'Link CTR', format: '%' },
+    optin: { critical: 15, poor: 25, average: 35, good: 45, elite: 100, label: 'Opt-in Rate', format: '%' },
+    showRate: { critical: 20, poor: 28, average: 35, good: 45, elite: 100, label: 'Show Rate', format: '%' },
+    pitchAttendance: { critical: 45, poor: 55, average: 65, good: 75, elite: 100, label: 'Pitch Attendance', format: '%' },
+    bookingRate: { critical: 8, poor: 15, average: 22, good: 30, elite: 100, label: 'Booking Rate', format: '%' },
+    callShowRate: { critical: 45, poor: 55, average: 65, good: 75, elite: 100, label: 'Call Show Rate', format: '%' },
+    closeRate: { critical: 10, poor: 15, average: 20, good: 28, elite: 100, label: 'Close Rate', format: '%' },
+    cashCollected: { critical: 35, poor: 50, average: 65, good: 80, elite: 100, label: 'Cash / List Price', format: '%' },
+    roas: { critical: 1.3, poor: 1.8, average: 2.5, good: 3.5, elite: 100, label: 'ROAS', format: 'x' },
+  },
+  vsl: {
+    cpm: { critical: 50, poor: 35, average: 25, good: 15, elite: 0, inverse: true, label: 'CPM', format: '$' },
+    lctr: { critical: 1, poor: 1.5, average: 2, good: 2.8, elite: 100, label: 'Link CTR', format: '%' },
+    vslPlayRate: { critical: 45, poor: 58, average: 68, good: 78, elite: 100, label: 'VSL Play Rate', format: '%' },
+    vslCompletion: { critical: 10, poor: 18, average: 28, good: 38, elite: 100, label: 'VSL Completion', format: '%' },
+    appSubmission: { critical: 4, poor: 8, average: 14, good: 20, elite: 100, label: 'Application Rate', format: '%' },
+    appToBooked: { critical: 35, poor: 50, average: 62, good: 75, elite: 100, label: 'App → Booked', format: '%' },
+    callShowRate: { critical: 40, poor: 50, average: 60, good: 70, elite: 100, label: 'Call Show Rate', format: '%' },
+    closeRate: { critical: 12, poor: 18, average: 25, good: 33, elite: 100, label: 'Close Rate', format: '%' },
+    cashCollected: { critical: 45, poor: 58, average: 70, good: 82, elite: 100, label: 'Cash / List Price', format: '%' },
+    roas: { critical: 1.3, poor: 2, average: 2.8, good: 4, elite: 100, label: 'ROAS', format: 'x' },
+  },
+  directCall: {
+    cpm: { critical: 35, poor: 25, average: 15, good: 10, elite: 0, inverse: true, label: 'CPM', format: '$' },
+    lctr: { critical: 1, poor: 1.5, average: 2.2, good: 3, elite: 100, label: 'Link CTR', format: '%' },
+    optin: { critical: 10, poor: 18, average: 26, good: 35, elite: 100, label: 'Opt-in / App Rate', format: '%' },
+    callShowRate: { critical: 30, poor: 40, average: 50, good: 60, elite: 100, label: 'Call Show Rate', format: '%' },
+    closeRate: { critical: 8, poor: 12, average: 18, good: 25, elite: 100, label: 'Close Rate', format: '%' },
+    cashCollected: { critical: 45, poor: 58, average: 70, good: 82, elite: 100, label: 'Cash / List Price', format: '%' },
+    roas: { critical: 1.2, poor: 1.8, average: 2.5, good: 3.5, elite: 100, label: 'ROAS', format: 'x' },
+  },
+  youtubeVsl: {
+    videoViews: { critical: 500, poor: 2000, average: 8000, good: 20000, elite: 100000, label: 'Avg Video Views', format: '' },
+    viewToClick: { critical: 0.5, poor: 1, average: 2, good: 3.5, elite: 100, label: 'View → LP Click', format: '%' },
+    optin: { critical: 20, poor: 32, average: 45, good: 58, elite: 100, label: 'LP Opt-in Rate', format: '%' },
+    vslPlayRate: { critical: 50, poor: 62, average: 72, good: 82, elite: 100, label: 'VSL Play Rate', format: '%' },
+    vslCompletion: { critical: 15, poor: 25, average: 35, good: 45, elite: 100, label: 'VSL Completion', format: '%' },
+    appSubmission: { critical: 6, poor: 12, average: 20, good: 28, elite: 100, label: 'Application Rate', format: '%' },
+    callShowRate: { critical: 50, poor: 60, average: 70, good: 80, elite: 100, label: 'Call Show Rate', format: '%' },
+    closeRate: { critical: 15, poor: 22, average: 30, good: 38, elite: 100, label: 'Close Rate', format: '%' },
+    cashCollected: { critical: 50, poor: 62, average: 75, good: 85, elite: 100, label: 'Cash / List Price', format: '%' },
+  },
+  youtubeWebinar: {
+    videoViews: { critical: 500, poor: 2000, average: 8000, good: 20000, elite: 100000, label: 'Avg Video Views', format: '' },
+    viewToClick: { critical: 0.5, poor: 1, average: 2, good: 3.5, elite: 100, label: 'View → Reg Click', format: '%' },
+    optin: { critical: 25, poor: 38, average: 50, good: 62, elite: 100, label: 'Reg Page Opt-in', format: '%' },
+    showRate: { critical: 25, poor: 35, average: 45, good: 55, elite: 100, label: 'Show Rate', format: '%' },
+    pitchAttendance: { critical: 50, poor: 60, average: 70, good: 80, elite: 100, label: 'Pitch Attendance', format: '%' },
+    bookingRate: { critical: 12, poor: 20, average: 28, good: 38, elite: 100, label: 'Booking Rate', format: '%' },
+    callShowRate: { critical: 50, poor: 60, average: 70, good: 80, elite: 100, label: 'Call Show Rate', format: '%' },
+    closeRate: { critical: 15, poor: 20, average: 27, good: 35, elite: 100, label: 'Close Rate', format: '%' },
+    cashCollected: { critical: 50, poor: 62, average: 75, good: 85, elite: 100, label: 'Cash / List Price', format: '%' },
+  },
+  socialDm: {
+    reach: { critical: 10000, poor: 50000, average: 150000, good: 500000, elite: 1000000, label: 'Monthly Reach', format: '' },
+    engagementRate: { critical: 0.8, poor: 1.5, average: 3, good: 5, elite: 100, label: 'Engagement Rate', format: '%' },
+    dmOpenRate: { critical: 25, poor: 38, average: 50, good: 62, elite: 100, label: 'DM Open Rate', format: '%' },
+    dmReplyRate: { critical: 3, poor: 7, average: 13, good: 20, elite: 100, label: 'DM Reply Rate', format: '%' },
+    replyToBooked: { critical: 8, poor: 15, average: 23, good: 32, elite: 100, label: 'Reply → Booked', format: '%' },
+    callShowRate: { critical: 45, poor: 55, average: 65, good: 75, elite: 100, label: 'Call Show Rate', format: '%' },
+    closeRate: { critical: 12, poor: 18, average: 25, good: 33, elite: 100, label: 'Close Rate', format: '%' },
+    cashCollected: { critical: 50, poor: 62, average: 75, good: 85, elite: 100, label: 'Cash / List Price', format: '%' },
+  },
+  organicWebinar: {
+    listSize: { critical: 1000, poor: 5000, average: 15000, good: 50000, elite: 200000, label: 'List Size', format: '' },
+    emailOpenRate: { critical: 15, poor: 20, average: 25, good: 32, elite: 100, label: 'Email Open Rate', format: '%' },
+    emailClickRate: { critical: 1, poor: 2, average: 3.5, good: 5, elite: 100, label: 'Email CTR', format: '%' },
+    regRate: { critical: 1.5, poor: 3, average: 5, good: 8, elite: 100, label: 'List → Registration', format: '%' },
+    showRate: { critical: 25, poor: 35, average: 45, good: 55, elite: 100, label: 'Show Rate', format: '%' },
+    pitchAttendance: { critical: 55, poor: 65, average: 73, good: 82, elite: 100, label: 'Pitch Attendance', format: '%' },
+    bookingRate: { critical: 15, poor: 23, average: 32, good: 42, elite: 100, label: 'Booking Rate', format: '%' },
+    callShowRate: { critical: 55, poor: 65, average: 73, good: 82, elite: 100, label: 'Call Show Rate', format: '%' },
+    closeRate: { critical: 18, poor: 25, average: 32, good: 40, elite: 100, label: 'Close Rate', format: '%' },
+    cashCollected: { critical: 55, poor: 68, average: 78, good: 88, elite: 100, label: 'Cash / List Price', format: '%' },
+  },
+};
+
+const FUNNEL_CATEGORIES = {
+  paid: { label: 'PAID', funnels: [{ id: 'webinar', name: 'WEBINAR' }, { id: 'vsl', name: 'VSL → CALL' }, { id: 'directCall', name: 'DIRECT CALL' }] },
+  organic: { label: 'ORGANIC', funnels: [{ id: 'youtubeVsl', name: 'YT → VSL' }, { id: 'youtubeWebinar', name: 'YT → WEBINAR' }, { id: 'socialDm', name: 'IG/TIKTOK → DM' }, { id: 'organicWebinar', name: 'LIST → WEBINAR' }] },
+};
+
+const STAT_META = {
+  cpm: { ease: 2, risk: 5, impact: 3 }, lctr: { ease: 4, risk: 5, impact: 4 }, optin: { ease: 5, risk: 3, impact: 4 },
+  showRate: { ease: 4, risk: 2, impact: 4 }, pitchAttendance: { ease: 3, risk: 2, impact: 3 }, bookingRate: { ease: 5, risk: 1, impact: 5 },
+  callShowRate: { ease: 4, risk: 2, impact: 3 }, closeRate: { ease: 3, risk: 1, impact: 5 }, cashCollected: { ease: 3, risk: 2, impact: 4 },
+  roas: { ease: 2, risk: 3, impact: 2 }, vslPlayRate: { ease: 4, risk: 3, impact: 3 }, vslCompletion: { ease: 3, risk: 2, impact: 3 },
+  appSubmission: { ease: 4, risk: 2, impact: 4 }, appToBooked: { ease: 4, risk: 2, impact: 3 }, videoViews: { ease: 2, risk: 4, impact: 5 },
+  viewToClick: { ease: 4, risk: 3, impact: 4 }, reach: { ease: 2, risk: 3, impact: 4 }, engagementRate: { ease: 3, risk: 3, impact: 3 },
+  dmOpenRate: { ease: 5, risk: 2, impact: 4 }, dmReplyRate: { ease: 4, risk: 2, impact: 5 }, replyToBooked: { ease: 5, risk: 1, impact: 5 },
+  listSize: { ease: 2, risk: 2, impact: 5 }, emailOpenRate: { ease: 5, risk: 2, impact: 4 }, emailClickRate: { ease: 4, risk: 2, impact: 4 },
+  regRate: { ease: 4, risk: 2, impact: 4 },
+};
+
+const FORMULAS = {
+  cpm: { formula: 'Ad Spend ÷ Impressions × 1,000', where: 'Facebook Ads Manager, Google Ads, TikTok Ads', note: 'Platform shows this natively, no calculation needed.' },
+  lctr: { formula: 'Link Clicks ÷ Impressions × 100', where: 'Facebook Ads Manager (Link Click-Through Rate column)', note: 'Use "Unique Link CTR" for cleaner data.' },
+  optin: { formula: 'Registrants ÷ Landing Page Views × 100', where: 'GHL / WebinarJam / Kit dashboard', note: 'Check the funnel analytics, NOT total list growth.' },
+  showRate: { formula: 'Live Attendees (peak) ÷ Total Registrants × 100', where: 'WebinarJam analytics', note: 'Use PEAK attendance, not average. Paid traffic shows lower than organic.' },
+  pitchAttendance: { formula: 'Attendees Still Watching at Pitch ÷ Peak Attendees × 100', where: 'WebinarJam "attendance over time" chart', note: 'Pull the attendee count at the timestamp your pitch starts.' },
+  bookingRate: { formula: 'Calls Booked ÷ Attendees at Pitch × 100', where: 'Calendly / GHL bookings compared to pitch attendance', note: 'Only count bookings made WITHIN 24hrs of the webinar.' },
+  callShowRate: { formula: 'Calls Taken ÷ Calls Booked × 100', where: 'Close CRM / Calendly / Fathom call logs', note: 'Count reschedules as shows if they happened within 7 days.' },
+  closeRate: { formula: 'Closed Deals ÷ Calls Taken × 100', where: 'Close CRM deals pipeline', note: 'Count only PIF and accepted payment plans, not "thinking about it."' },
+  cashCollected: { formula: 'Cash Collected Day-Of ÷ Full Contract Value × 100', where: 'Whop / Stripe deposits vs. CCV in Close', note: 'Shows how much of the deal you actually banked upfront vs. financed.' },
+  roas: { formula: 'Total Revenue ÷ Total Ad Spend', where: 'Stripe/Whop revenue ÷ Ads Manager spend', note: 'Use cash collected, not contract value. CCV inflates ROAS.' },
+  vslPlayRate: { formula: 'Video Plays ÷ Landing Page Views × 100', where: 'Wistia / Vimeo / VSL platform analytics', note: 'Autoplay inflates this. Use manual-play rate for accuracy.' },
+  vslCompletion: { formula: 'Viewers Who Finished ÷ Total Plays × 100', where: 'Wistia / Vimeo retention curve (100% mark)', note: 'Long VSLs (30+ min) rarely exceed 35-40% completion.' },
+  appSubmission: { formula: 'Applications Submitted ÷ VSL Viewers × 100', where: 'Typeform / GHL form analytics', note: 'Measure from "finished VSL" to "submitted app," not total LP views.' },
+  appToBooked: { formula: 'Calls Booked ÷ Applications Submitted × 100', where: 'Calendly bookings vs Typeform/GHL submissions', note: 'Gap here = friction after app. Usually calendar availability.' },
+  videoViews: { formula: 'Average Views Per Video (last 10 uploads)', where: 'YouTube Studio / TikTok Analytics', note: 'Use median, not mean. One viral video skews the average.' },
+  viewToClick: { formula: 'LP Clicks From Video ÷ Total Video Views × 100', where: 'YouTube Studio "external clicks" + UTM tracking', note: 'Track with unique UTMs per video to isolate which videos convert.' },
+  reach: { formula: 'Total Unique Accounts Reached (30 days)', where: 'IG/TikTok Insights → Reach metric', note: 'Not followers. Reach = unique accounts that saw your content.' },
+  engagementRate: { formula: '(Likes + Comments + Shares + Saves) ÷ Reach × 100', where: 'IG/TikTok native analytics', note: 'Saves weigh most on IG, shares weigh most on TikTok.' },
+  dmOpenRate: { formula: 'DMs Opened ÷ DMs Sent × 100', where: 'Manual tracking in spreadsheet, or ManyChat analytics', note: 'IG does not natively show this. Track via follow-up response patterns.' },
+  dmReplyRate: { formula: 'DMs Replied ÷ DMs Sent × 100', where: 'Spreadsheet tracking or ManyChat flow analytics', note: 'Count any reply, even "not interested." Filters quality later.' },
+  replyToBooked: { formula: 'Calls Booked ÷ DM Replies × 100', where: 'Calendly bookings tagged by source + DM tracking sheet', note: 'Tag every DM lead in Close/Calendly with source = "IG DM" to isolate.' },
+  listSize: { formula: 'Total Active Subscribers (not unsubscribed/bounced)', where: 'Kit / ConvertKit / GHL email dashboard', note: 'Scrub cold contacts (90+ days no open) before measuring.' },
+  emailOpenRate: { formula: 'Emails Opened ÷ Emails Delivered × 100', where: 'Kit / ConvertKit campaign report', note: 'iOS Mail Privacy inflates opens 10-15%. Clicks are more reliable.' },
+  emailClickRate: { formula: 'Clicks ÷ Emails Delivered × 100', where: 'Kit / ConvertKit campaign report', note: 'Use CTOR (clicks ÷ opens) for a truer engagement signal.' },
+  regRate: { formula: 'Webinar Registrants ÷ Emails Delivered × 100', where: 'Kit campaign clicks vs WebinarJam registrations', note: 'Only count the promo sequence, not evergreen automations.' },
+};
+
+const CALCULATORS = {
+  cpm: { fields: [{ key: 'spend', label: 'Ad Spend', prefix: '$' }, { key: 'impressions', label: 'Impressions', prefix: '' }], calc: (v) => v.impressions > 0 ? (v.spend / v.impressions) * 1000 : 0 },
+  lctr: { fields: [{ key: 'clicks', label: 'Link Clicks', prefix: '' }, { key: 'impressions', label: 'Impressions', prefix: '' }], calc: (v) => v.impressions > 0 ? (v.clicks / v.impressions) * 100 : 0 },
+  optin: { fields: [{ key: 'registrants', label: 'Registrants', prefix: '' }, { key: 'lpViews', label: 'LP Views', prefix: '' }], calc: (v) => v.lpViews > 0 ? (v.registrants / v.lpViews) * 100 : 0 },
+  showRate: { fields: [{ key: 'attendees', label: 'Peak Attendees', prefix: '' }, { key: 'registrants', label: 'Registrants', prefix: '' }], calc: (v) => v.registrants > 0 ? (v.attendees / v.registrants) * 100 : 0 },
+  pitchAttendance: { fields: [{ key: 'pitchAtt', label: 'At Pitch', prefix: '' }, { key: 'peakAtt', label: 'Peak Attendees', prefix: '' }], calc: (v) => v.peakAtt > 0 ? (v.pitchAtt / v.peakAtt) * 100 : 0 },
+  bookingRate: { fields: [{ key: 'booked', label: 'Calls Booked', prefix: '' }, { key: 'pitchAtt', label: 'At Pitch', prefix: '' }], calc: (v) => v.pitchAtt > 0 ? (v.booked / v.pitchAtt) * 100 : 0 },
+  callShowRate: { fields: [{ key: 'taken', label: 'Calls Taken', prefix: '' }, { key: 'booked', label: 'Calls Booked', prefix: '' }], calc: (v) => v.booked > 0 ? (v.taken / v.booked) * 100 : 0 },
+  closeRate: { fields: [{ key: 'closed', label: 'Closed Deals', prefix: '' }, { key: 'taken', label: 'Calls Taken', prefix: '' }], calc: (v) => v.taken > 0 ? (v.closed / v.taken) * 100 : 0 },
+  cashCollected: { fields: [{ key: 'cash', label: 'Cash Collected', prefix: '$' }, { key: 'ccv', label: 'Contract Value', prefix: '$' }], calc: (v) => v.ccv > 0 ? (v.cash / v.ccv) * 100 : 0 },
+  roas: { fields: [{ key: 'revenue', label: 'Revenue', prefix: '$' }, { key: 'spend', label: 'Ad Spend', prefix: '$' }], calc: (v) => v.spend > 0 ? (v.revenue / v.spend) : 0 },
+  vslPlayRate: { fields: [{ key: 'plays', label: 'Plays', prefix: '' }, { key: 'lpViews', label: 'LP Views', prefix: '' }], calc: (v) => v.lpViews > 0 ? (v.plays / v.lpViews) * 100 : 0 },
+  vslCompletion: { fields: [{ key: 'finished', label: 'Finished VSL', prefix: '' }, { key: 'plays', label: 'Plays', prefix: '' }], calc: (v) => v.plays > 0 ? (v.finished / v.plays) * 100 : 0 },
+  appSubmission: { fields: [{ key: 'apps', label: 'Apps Submitted', prefix: '' }, { key: 'viewers', label: 'VSL Viewers', prefix: '' }], calc: (v) => v.viewers > 0 ? (v.apps / v.viewers) * 100 : 0 },
+  appToBooked: { fields: [{ key: 'booked', label: 'Calls Booked', prefix: '' }, { key: 'apps', label: 'Apps Submitted', prefix: '' }], calc: (v) => v.apps > 0 ? (v.booked / v.apps) * 100 : 0 },
+  viewToClick: { fields: [{ key: 'clicks', label: 'LP Clicks', prefix: '' }, { key: 'views', label: 'Video Views', prefix: '' }], calc: (v) => v.views > 0 ? (v.clicks / v.views) * 100 : 0 },
+  engagementRate: { fields: [{ key: 'engagements', label: 'Likes+Comments+Shares+Saves', prefix: '' }, { key: 'reach', label: 'Reach', prefix: '' }], calc: (v) => v.reach > 0 ? (v.engagements / v.reach) * 100 : 0 },
+  dmOpenRate: { fields: [{ key: 'opened', label: 'DMs Opened', prefix: '' }, { key: 'sent', label: 'DMs Sent', prefix: '' }], calc: (v) => v.sent > 0 ? (v.opened / v.sent) * 100 : 0 },
+  dmReplyRate: { fields: [{ key: 'replied', label: 'DMs Replied', prefix: '' }, { key: 'sent', label: 'DMs Sent', prefix: '' }], calc: (v) => v.sent > 0 ? (v.replied / v.sent) * 100 : 0 },
+  replyToBooked: { fields: [{ key: 'booked', label: 'Calls Booked', prefix: '' }, { key: 'replies', label: 'DM Replies', prefix: '' }], calc: (v) => v.replies > 0 ? (v.booked / v.replies) * 100 : 0 },
+  emailOpenRate: { fields: [{ key: 'opened', label: 'Emails Opened', prefix: '' }, { key: 'delivered', label: 'Emails Delivered', prefix: '' }], calc: (v) => v.delivered > 0 ? (v.opened / v.delivered) * 100 : 0 },
+  emailClickRate: { fields: [{ key: 'clicks', label: 'Clicks', prefix: '' }, { key: 'delivered', label: 'Emails Delivered', prefix: '' }], calc: (v) => v.delivered > 0 ? (v.clicks / v.delivered) * 100 : 0 },
+  regRate: { fields: [{ key: 'regs', label: 'Registrants', prefix: '' }, { key: 'delivered', label: 'Emails Delivered', prefix: '' }], calc: (v) => v.delivered > 0 ? (v.regs / v.delivered) * 100 : 0 },
+};
+
+const PLAYBOOKS = {
+  cpm: { substats: ['Audience fatigue', 'Ad account health', 'Placement mix', 'Day-parting'], tests: ['Launch new cold audience (lookalike refresh)', 'Rotate 3-5 new creative batches', 'Test Reels + Stories placement'], warning: 'High risk. Cheap audience changes tank lead quality downstream.' },
+  lctr: { substats: ['Thumb-stop %', 'Video retention curve', 'Hook strength', 'CTA clarity'], tests: ['Rewrite 5 new hooks using proof-first angles', 'Cut first 3 seconds, relaunch with stronger openers', 'Test static vs video vs UGC'], warning: 'High risk. Spammy hooks spike CTR but tank opt-in and close rates.' },
+  optin: { substats: ['VSL play rate', 'Headline strength', 'Page load speed', 'Form friction'], tests: ['Split test 3 new headlines', 'Reduce form fields to email + phone only', 'Record Hotjar sessions to find drop points'], warning: 'Moderate risk. Fastest lever to pull on most funnels.' },
+  showRate: { substats: ['Email deliverability', 'SMS deliverability', 'ManyChat flow completion', 'Reminder cadence'], tests: ['Add SMS reminders at 24hr, 1hr, 10min before', 'Layer ManyChat alongside email + SMS', 'Add confirmation page video'], warning: 'Low risk. Aggressive multi-channel reminders rarely hurt.' },
+  pitchAttendance: { substats: ['Webinar runtime', 'Content pacing', 'Interactive elements', 'Presenter energy'], tests: ['Cut 10-15 min of pre-pitch content', 'Add polls every 8-10 min', 'Move pitch earlier if drop after 45 min'], warning: 'Moderate risk. Rushing pitch can hurt booking rate.' },
+  bookingRate: { substats: ['Pitch strength', 'Permission to close', 'Offer construction', 'Call slot availability'], tests: ['Rewrite pitch with "permission to close" frame', 'Add evening + weekend call slots', 'Reduce app to 3-5 questions max'], warning: 'Low risk. Highest leverage stat on most webinars.' },
+  callShowRate: { substats: ['Setter follow-up speed', 'Day-of reminders', 'Setter perceived authenticity', 'Messaging platform'], tests: ['Selfie-video follow-up within 1hr of booking', 'Morning-of text + 1hr-before text', 'Audit setter quality via screen-share'], warning: 'Low risk. Setter variance hides big gaps, audit individually.' },
+  closeRate: { substats: ['Closer-specific rates', 'Script adherence', 'Objection handling', 'Payment plan positioning'], tests: ['Review Fathom recordings for top 3 objections', 'Compare close rates by closer, replace bottom 30%', 'Test deposit-first vs full PIF close'], warning: 'Low risk. Contained to sales team execution.' },
+  cashCollected: { substats: ['Offer stack', 'Upsell / order bump', 'Payment plan length', 'Down-sell option'], tests: ['Add PIF discount to pull more cash day-of', 'Test 3-pay vs 6-pay plan', 'Introduce strategic down-sell'], warning: 'Moderate risk. Price changes can drop conversion if poorly positioned.' },
+  roas: { substats: ['Downstream of every stat above'], tests: ['ROAS is downstream. Fix the top bottleneck, ROAS follows.'], warning: 'Not directly fixable. Output of every stat above it.' },
+  vslPlayRate: { substats: ['Thumbnail design', 'Page load speed', 'Auto-play settings', 'Above-the-fold position'], tests: ['Test custom thumbnail with host face', 'Move VSL higher on page', 'Enable auto-play muted'], warning: 'Moderate risk. Auto-play can help or hurt depending on traffic.' },
+  vslCompletion: { substats: ['First 30 sec hook', 'Pacing', 'Proof placement', 'Pitch timing in VSL'], tests: ['Rewrite first 30 seconds with pattern interrupt', 'Move strongest proof earlier', 'Cut 15-20% of runtime'], warning: 'Low risk. Better completion = better booking.' },
+  appSubmission: { substats: ['Form length', 'Qualification questions', 'CTA copy', 'Post-VSL friction'], tests: ['Reduce questions to 3-5 essentials', 'Test single-page app vs multi-step', 'Rewrite CTA for next-step clarity'], warning: 'Low risk. Shorter forms almost always win.' },
+  appToBooked: { substats: ['Calendar loading', 'Call slot availability', 'Confirmation clarity', 'Follow-up speed'], tests: ['Add slots before 9am and after 5pm', 'Auto-reminder if app submitted but not booked in 15min', 'Shorten booking flow under 60 seconds'], warning: 'Low risk. Usually easy wins here.' },
+  videoViews: { substats: ['Thumbnail CTR', 'Title hooks', 'Upload frequency', 'Topic relevance'], tests: ['A/B test thumbnails with TubeBuddy', 'Rewrite titles with specificity', 'Check Google Trends for rising topics'], warning: 'Slow-moving stat. Needs 30-90 days.' },
+  viewToClick: { substats: ['End-screen CTA', 'Pinned comment link', 'Description placement', 'In-video verbal CTA'], tests: ['Add verbal CTA at 60% mark', 'Pin comment with link + benefit', 'Test 3 end-screen designs'], warning: 'Moderate risk. Too many CTAs kill trust.' },
+  reach: { substats: ['Post frequency', 'Hook in first 1-2 sec', 'Hashtag/sound strategy', 'Algorithm alignment'], tests: ['Post 2x daily for 30 days', 'Rewrite first 1 sec of top 5 posts', 'Test trending sounds'], warning: 'Slow stat. Consistency wins.' },
+  engagementRate: { substats: ['Caption prompts', 'Save-worthy format', 'Comment reply speed', 'Polarizing takes'], tests: ['End posts with direct question', 'Reply to comments within 1hr', 'Test polarizing vs how-to'], warning: 'Low risk. Higher engagement = higher reach.' },
+  dmOpenRate: { substats: ['First message hook', 'Profile quality', 'Personalization', 'Send time'], tests: ['Personalize first line', 'Send 9-11am their timezone', 'Keep first message under 2 sentences'], warning: 'Low risk. Shorter + personal wins.' },
+  dmReplyRate: { substats: ['Opener question quality', 'Value-first (no pitch DM1)', 'Follow-up cadence', 'Authenticity'], tests: ['Lead with question about their content', 'Never pitch in first 2 messages', 'Follow up 3 times'], warning: 'Low risk. Pitching early kills replies.' },
+  replyToBooked: { substats: ['Trust build', 'Calendar link timing', 'Social proof', 'Objection preemption'], tests: ['Send 2-3 voice notes before link', 'Share 1 case study mid-convo', 'Preempt price with "no-pressure intro"'], warning: 'Low risk. Highest leverage on DM funnels.' },
+  listSize: { substats: ['Lead magnet quality', 'Opt-in placement', 'Referral mechanics', 'Webinar opt-ins'], tests: ['Add CTAs to every YouTube desc + pinned comment', 'Launch free training that captures email', 'Add referral reward'], warning: 'Slow stat. Compounds over months.' },
+  emailOpenRate: { substats: ['Subject lines', 'Sender reputation', 'Send time', 'List hygiene'], tests: ['A/B test 3 subject lines', 'Scrub list with NeverBounce quarterly', 'Send 8am recipient timezone'], warning: 'Low risk. Cold contacts tank deliverability.' },
+  emailClickRate: { substats: ['CTA clarity', 'Email length', 'Link placement', 'Curiosity vs specificity'], tests: ['Single CTA per email, 2-3x', 'Under 200 words for webinar promo', 'Test "P.S. line" with CTA'], warning: 'Low risk. Shorter emails with one ask win.' },
+  regRate: { substats: ['Subject specificity', 'Promise clarity', 'Urgency/scarcity', 'Social proof in sequence'], tests: ['4-email sequence: teaser → proof → urgency → final call', 'Add "only X spots left" scarcity', 'Include testimonial in email 2'], warning: 'Low risk. Multi-email sequences win 3-5x.' },
+};
+
+// ============ SOLVE PLANS ============
+// Deep-dive 4-phase plans for each bottleneck, grounded in T5 / Jeremy Haynes SOPs
+const SOLVE_PLANS = {
+  showRate: {
+    diagnosis: 'Show rate is the gap between registrations and live attendance. Below 35% on paid webinars usually means your reminder sequence is too light, deliverability is broken, or you\'re not framing the value of showing up live.',
+    sopRef: 'SOP 2 (Hammer Them) + SOP 4 (Mastering Webinars) + SOP 18 (Ultimate Sales Guide)',
+    rootCauses: [
+      { cause: 'Reminder sequence too light', signal: 'Only 1-2 emails before webinar, no SMS, no ManyChat' },
+      { cause: 'Email deliverability compromised', signal: 'Open rates under 25% on reminder sends' },
+      { cause: 'Weak pre-frame / no urgency to show live', signal: 'Registrants don\'t know WHY live matters vs replay' },
+      { cause: 'Confirmation page has no video', signal: 'Just a thank-you page, no indoctrination' },
+    ],
+    phases: [
+      {
+        name: 'Phase 1 — Reminder Stack (24-48hr)',
+        actions: [
+          'Build full multi-channel reminder sequence: Email + SMS + ManyChat (Hydra Strategy)',
+          'Cadence: 24hr before, 3hr before, 1hr before, 10min before',
+          'SMS must include area code matching recipient for 2x pickup rate',
+          'ManyChat flow with comment-trigger on latest post: "DM me SHOW to get the link"',
+          'Confirmation page: embedded host video + event details + "add to calendar" button',
+        ],
+      },
+      {
+        name: 'Phase 2 — Pre-Frame Content (48-72hr)',
+        actions: [
+          'Deploy Hammer Them campaign: 15-20 content pieces in 72hr window before webinar',
+          'Include in content: mechanism explanation, proof elements, one objection crush per piece',
+          'Write value-dense emails (not reminder stubs) — full story/framing inside the email body',
+          'Each email answers ONE objection or reinforces ONE belief',
+          'Include "live only" bonus mention to anchor the urgency to show live',
+        ],
+      },
+      {
+        name: 'Phase 3 — Deliverability Audit (Day 1)',
+        actions: [
+          'Verify SPF, DKIM, DMARC records on sending domain',
+          'Scrub list with NeverBounce (remove 2%+ bounce rate contacts)',
+          'Segment list: engaged (opened in last 30d) vs cold — send reminders ONLY to engaged',
+          'Warm up sending domain if new (send small volume first, ramp over 7-10 days)',
+          'Use verified Kit domain, NOT shared sender',
+        ],
+      },
+      {
+        name: 'Phase 4 — Measure & Iterate',
+        actions: [
+          'Track show rate segmented by traffic source (paid vs organic vs email)',
+          'Track show rate by reminder channel (which drove the attendee?)',
+          'If paid cold still under 35%, check lead quality upstream (CPM/LCTR likely choked)',
+          'Target: move to 40%+ within 2 weeks of full reminder stack deployed',
+        ],
+      },
+    ],
+    tools: ['Kit (email)', 'GHL (SMS)', 'ManyChat (IG DM automation)', 'WebinarJam', 'NeverBounce'],
+    expectedLift: '+10-15% show rate within 14 days of full Hammer Them + Hydra deployment',
+  },
+  bookingRate: {
+    diagnosis: 'Booking rate is the most leverage-heavy stat on webinars per Jeremy Haynes. Under 20% means the pitch itself is weak — either you\'re not asking for permission to close, the offer construction is off, or there\'s too much friction between pitch and calendar.',
+    sopRef: 'SOP 4 (Mastering Webinars) + SOP 18 (Ultimate Sales Guide) + $5M Info Product Overview',
+    rootCauses: [
+      { cause: 'No "permission to close" transition', signal: 'Pitch drops in cold, viewers check out' },
+      { cause: 'Offer construction is flat', signal: 'No scarcity, no bonuses, no risk-reversal' },
+      { cause: 'Call booking friction', signal: '10+ question app, business-hours-only call slots' },
+      { cause: 'No live urgency mechanism', signal: 'Viewers think they can "book later" and never do' },
+    ],
+    phases: [
+      {
+        name: 'Phase 1 — Rewrite the Pitch Transition (Day 1)',
+        actions: [
+          'Implement Russell Brunson "permission to close" frame: ask for explicit permission before pitching',
+          'Example: "Would it be okay if I share an opportunity I think could help you? Drop a 1 in the chat if yes."',
+          'Wait for chat engagement before continuing — creates micro-commitment',
+          'After permission granted, pitch hard and clear, no soft-selling',
+          'Reference T5 SOP: "how you pitch, how long you pitch, how hard you pitch" all matter',
+        ],
+      },
+      {
+        name: 'Phase 2 — Offer Construction (Day 2-3)',
+        actions: [
+          'Stack the offer: core deliverable + 3-5 tangible bonuses + risk reversal',
+          'Add live-only scarcity: "First 10 bookings get [bonus] — only available on this call"',
+          'Anchor pricing against higher comparable (competitor cost or DFY cost)',
+          'Make the CTA obvious: single action = book the call, no other choices',
+          'Reference Hormozi Goated Ads pricing anchor principles from playbook',
+        ],
+      },
+      {
+        name: 'Phase 3 — Reduce Call Booking Friction (Day 3-4)',
+        actions: [
+          'Cut application to 3-5 essential qualifying questions max',
+          'Add call slots before 9am and after 5pm in host\'s timezone',
+          'Add weekend availability (Saturday 10am-2pm minimum)',
+          'Direct-to-calendar after pitch — no app page, no middle step',
+          'Test: direct calendar link vs app-then-calendar (usually direct wins for webinars)',
+        ],
+      },
+      {
+        name: 'Phase 4 — Re-Pitch & Objection Handling',
+        actions: [
+          'After main pitch, do a 5-minute objection handling block covering top 3 objections',
+          'Re-pitch at the end with urgency ("calendar closes tonight" or bonus expiry)',
+          'Add FAQ section to replay / confirmation page for people watching recording',
+          'Deploy post-webinar sequence: 3-email follow-up for non-bookers over 48hr',
+          'Target: 22-30% booking rate within 2 webinars of implementing this',
+        ],
+      },
+    ],
+    tools: ['WebinarJam (live chat for permission frame)', 'Calendly (expanded slots)', 'Typeform/GHL (shortened app)', 'Kit (post-webinar sequence)'],
+    expectedLift: 'From 11% → 22-30% booking rate within 2-3 webinars (Jeremy Haynes benchmark)',
+  },
+  closeRate: {
+    diagnosis: 'Close rate below 20% on webinar-qualified leads means the sales process is leaking value. Could be script, closer quality, objection handling, or payment plan positioning. Most common fix: closer variance (one closer is carrying the team, others are dragging it down).',
+    sopRef: 'SOP 18 (Ultimate Sales Guide) + Acquisition.com Closing Playbook + Fathom call review',
+    rootCauses: [
+      { cause: 'Closer variance — top vs bottom 30%', signal: 'Close rates vary 15%+ between closers' },
+      { cause: 'Weak objection handling', signal: 'Same objections killing deals repeatedly' },
+      { cause: 'No deposit-first option', signal: 'All-or-nothing PIF pitch kills payment plan buyers' },
+      { cause: 'Setters sending unqualified leads', signal: 'High show rate but bad fit on calls' },
+    ],
+    phases: [
+      {
+        name: 'Phase 1 — Call Recording Audit (Day 1-3)',
+        actions: [
+          'Pull last 20 Fathom recordings of lost deals',
+          'Categorize top 3 objections by frequency (usually: price, timing, partner/spouse)',
+          'Identify where closers break script or lose control of the call',
+          'Note the average call length of closed vs lost deals',
+          'Flag calls where closer didn\'t ask a hard close question',
+        ],
+      },
+      {
+        name: 'Phase 2 — Rewrite Objection Rebuttals (Day 3-5)',
+        actions: [
+          'Use Hormozi closes: "Both Options Are Risk Free", "Decadere", "1 to 10 Close"',
+          'Price objection: "Best Case Worst Case" frame with risk reversal',
+          'Timing objection: "You saw an ad, clicked, opted in, showed up... you\'re 6 inches from gold"',
+          'Partner objection: "What would they need to hear to feel good about this?"',
+          'Script each rebuttal into a 30-second block — closer memorizes verbatim',
+        ],
+      },
+      {
+        name: 'Phase 3 — Closer Performance & Replacement',
+        actions: [
+          'Rank closers by close rate over last 60 days',
+          'Top 30% — give them more calls, pay higher commission',
+          'Middle 40% — coach weekly with call reviews, set 30-day improvement target',
+          'Bottom 30% — replace or move to setter role',
+          'Record top closer\'s best call, use as training asset for new hires',
+        ],
+      },
+      {
+        name: 'Phase 4 — Payment Plan & Close Mechanics',
+        actions: [
+          'Add deposit-first option ($500-$1000 today, balance in 7 days)',
+          'Test "Decadere" close on fence-sitters — reframes decision as cutting off future',
+          'Test "1 to 10" close — where are you, what would get you to a 10?',
+          'Deploy post-call follow-up: 3-touch sequence over 72hr (SMS + call + email)',
+          'Target: 20-28% close rate sustained across full sales team',
+        ],
+      },
+    ],
+    tools: ['Fathom (call recordings)', 'Close CRM (closer analytics)', 'Stripe (deposit processing)', 'Hormozi Closing Playbook'],
+    expectedLift: '+5-10% close rate within 30 days of closer audit + objection rebuild',
+  },
+  cpm: {
+    diagnosis: 'High CPM means your ads are burning money before they even get clicks. Usually audience fatigue, ad account penalization, or bidding into saturated placements. Warning: cheap CPM fixes often tank lead quality — be careful what you optimize for.',
+    sopRef: 'SOP 6 (If This Then That) + SOP 15 (Forester) + SOP 14 (Venus Fly Trap) + Ad Fatigue Protocol',
+    rootCauses: [
+      { cause: 'Audience fatigue', signal: 'Frequency 3.5+ and climbing' },
+      { cause: 'Creative fatigue', signal: 'CTR dropping week-over-week on same ads' },
+      { cause: 'Narrow audience exhaustion', signal: 'Small lookalike or interest stack maxed out' },
+      { cause: 'Competitive placement bidding', signal: 'High-competition niche during peak auction hours' },
+    ],
+    phases: [
+      {
+        name: 'Phase 1 — Audience Refresh (Day 1-2)',
+        actions: [
+          'Pause audiences with frequency above 4.0',
+          'Build new 1% lookalike from last 90 days of purchasers (not all leads)',
+          'Layer interest stack: 3-5 new interests not tested in last 60 days',
+          'Test broad targeting (no interests) with strong creative hooks',
+          'Deploy Forester Strategy: warm-up engagement campaign before direct response',
+        ],
+      },
+      {
+        name: 'Phase 2 — Creative Rotation (Day 2-4)',
+        actions: [
+          'Launch 3-5 new creative angles using Hook-Meat-CTA framework',
+          'Rotate formats: static, video, UGC, carousel',
+          'Kill any ad with CTR below 0.8% after 500 impressions',
+          'A/B test Reels + Stories placement against Feed-only',
+          'Use Venus Fly Trap: engagement-first creative before direct response',
+        ],
+      },
+      {
+        name: 'Phase 3 — Placement & Day-parting',
+        actions: [
+          'Check placement breakdown — pause expensive placements if they\'re not converting',
+          'Test day-parting: pause between 11pm-5am if CPM spikes at night',
+          'Move spend to Advantage+ placements if currently manual',
+          'Test Instagram Reels + TikTok if currently Facebook-only',
+        ],
+      },
+      {
+        name: 'Phase 4 — Downstream Quality Check',
+        actions: [
+          'CRITICAL: monitor downstream stats after CPM drops',
+          'If opt-in rate drops 5%+, you optimized for cheap clicks not quality traffic',
+          'Track cost per QUALIFIED call, not just cost per CPM',
+          'Target: CPM reduction of 20-30% while maintaining opt-in rate',
+        ],
+      },
+    ],
+    tools: ['Facebook Ads Manager', 'TikTok Ads', 'Venus Fly Trap SOP', 'Forester SOP', 'Ad Fatigue Protocol'],
+    expectedLift: 'CPM reduction 20-40% within 14 days, without downstream quality loss',
+  },
+  lctr: {
+    diagnosis: 'Link CTR below 1.5% on cold traffic means hooks are weak or creative is fatigued. Easy to fix with hook rewrites, but risky — spammy hooks can boost CTR while destroying opt-in and close rates downstream.',
+    sopRef: 'SOP 20 (Top Hooks & Headlines) + SOP 26 (Direct Response Ad Creation) + 100M Hooks Playbook',
+    rootCauses: [
+      { cause: 'Weak first 3 seconds', signal: 'Video drop-off above 40% in first 3 sec' },
+      { cause: 'Generic hooks everyone uses', signal: 'Hook sounds like every competitor' },
+      { cause: 'CTA unclear or buried', signal: 'Viewer doesn\'t know what to do after watching' },
+      { cause: 'Creative format wrong for audience', signal: 'Static ads for video-native audience' },
+    ],
+    phases: [
+      {
+        name: 'Phase 1 — Rewrite Top 5 Hooks (Day 1-2)',
+        actions: [
+          'Pull T5 Swipe File (SOP 20) for proven hook formats',
+          'Rewrite using proof-first angles: "$30M+ generated for clients" vs generic claims',
+          'Test pattern interrupts: unexpected statement, visual jump, question opening',
+          'Include specificity in first 3 seconds: numbers, names, timeframes',
+          'Banned: vague phrases like "scale your business" or "next level"',
+        ],
+      },
+      {
+        name: 'Phase 2 — Cut First 3 Seconds Aggressively',
+        actions: [
+          'Review all running ads — cut the first 3 seconds if it\'s slow',
+          'Start with mid-action, mid-sentence for pattern interrupt',
+          'Test "speaker reveal" delay vs immediate talking head',
+          'Add captions/subtitles from frame 1 (most viewers muted)',
+        ],
+      },
+      {
+        name: 'Phase 3 — Test Creative Formats',
+        actions: [
+          'Launch 3 format variants: talking head, UGC-style, static with bold text',
+          'Test 15-second short-form against 60-second deeper context ads',
+          'Add motion graphics / text overlays to static ads',
+          'Deploy Hormozi Goated Ads framework: Hook → Meat → CTA in that exact order',
+        ],
+      },
+      {
+        name: 'Phase 4 — Monitor Downstream',
+        actions: [
+          'CRITICAL: if CTR jumps 50%+ but opt-in drops, you wrote clickbait not a hook',
+          'Track cost per QUALIFIED opt-in, not just cost per click',
+          'Kill any hook that boosts CTR but tanks show rate',
+          'Target: CTR 2-3% with opt-in rate maintained or higher',
+        ],
+      },
+    ],
+    tools: ['T5 Swipe File (SOP 20)', 'Hormozi 100M Hooks Playbook', 'Facebook Ads Manager', 'Submagic (captions)'],
+    expectedLift: 'CTR 1.5-3% within 10 days of hook rewrite + creative refresh',
+  },
+  optin: {
+    diagnosis: 'Opt-in rate below 30% means your landing page isn\'t converting the traffic you\'re paying to send it. This is the fastest lever on most funnels — headline swaps, VSL edits, and form reductions move the needle quickest.',
+    sopRef: 'SOP 3 (Mastering VSLs) + SOP 28 (Confirmation Page Best Practices) + 100M Goated Ads',
+    rootCauses: [
+      { cause: 'Weak or unclear headline', signal: 'Headline doesn\'t match ad promise' },
+      { cause: 'VSL play rate under 60%', signal: 'Visitors leaving before hearing pitch' },
+      { cause: 'Form friction (too many fields)', signal: '5+ fields or multi-step form' },
+      { cause: 'Page load speed slow', signal: '3+ seconds on mobile' },
+    ],
+    phases: [
+      {
+        name: 'Phase 1 — Headline A/B Test (Day 1)',
+        actions: [
+          'Write 5 new headlines using proof-first structure',
+          'Format: "[Proof] + [Mechanism] + [Outcome]" — ex: "How Cue Banks Scaled to $5M+ Using This Webinar System"',
+          'Match headline to ad creative promise (continuity of message)',
+          'Deploy split test with 50/50 traffic split, decide winner after 500 visitors per variant',
+        ],
+      },
+      {
+        name: 'Phase 2 — VSL / Above-Fold Optimization (Day 2-3)',
+        actions: [
+          'Review VSL play rate — if under 60%, thumbnail is weak',
+          'Test custom thumbnail with host face + bold text overlay',
+          'Move VSL higher on page — above the fold, minimal text above it',
+          'Test auto-play muted vs manual play (audiences differ)',
+          'If VSL over 10 min, add chapter markers for skip-ability',
+        ],
+      },
+      {
+        name: 'Phase 3 — Form Friction Reduction (Day 3)',
+        actions: [
+          'Cut form to 2 fields: email + phone (drop first name, last name, company, etc.)',
+          'Use inline validation — no "submit then error" loops',
+          'Make CTA button specific: "Save My Seat →" not "Submit"',
+          'Add trust elements near form: testimonial, logo bar, privacy note',
+          'Mobile-first check — 80%+ traffic is mobile, form must be thumb-friendly',
+        ],
+      },
+      {
+        name: 'Phase 4 — Behavior Analysis',
+        actions: [
+          'Install Hotjar / Microsoft Clarity session recording',
+          'Review 20 recordings — identify rage clicks, scroll-bounce, form abandons',
+          'Fix anything that creates visible confusion',
+          'Target: 35-45% opt-in rate within 7 days',
+        ],
+      },
+    ],
+    tools: ['GHL / ClickFunnels', 'Wistia (VSL analytics)', 'Hotjar (session recording)', 'T5 Swipe File'],
+    expectedLift: '+10-15% opt-in rate within 7 days of headline + form optimization',
+  },
+  pitchAttendance: {
+    diagnosis: 'Pitch attendance under 65% means people are leaving before you pitch. Too much pre-pitch content, weak pacing, or they\'re not engaged enough to stick around. Fix the webinar structure itself.',
+    sopRef: 'SOP 4 (Mastering Webinars) + Jeremy Haynes Webinar Structure',
+    rootCauses: [
+      { cause: 'Webinar too long before pitch', signal: 'Pitch hits after 60+ min mark' },
+      { cause: 'No interactive elements', signal: 'One-way presentation, no polls/chat' },
+      { cause: 'Weak content pacing', signal: 'Same energy throughout, no peaks' },
+      { cause: 'Pitch anxiety — host delays it', signal: 'Padding content to avoid selling' },
+    ],
+    phases: [
+      {
+        name: 'Phase 1 — Cut Runtime (Day 1)',
+        actions: [
+          'Target pitch at 40-50 minute mark, not 60+',
+          'Cut 10-15 min of pre-pitch content that doesn\'t move viewers toward pitch',
+          'Remove redundant proof points — pick strongest 3, not all 10',
+          'Tighten mechanism explanation to 5-7 min max',
+        ],
+      },
+      {
+        name: 'Phase 2 — Add Engagement Hooks',
+        actions: [
+          'Drop polls every 8-10 minutes ("drop a 1 in chat if this resonates")',
+          'Ask direct questions that require chat responses',
+          'Use "pattern interrupts" every 10 min — visual change, story, hot take',
+          'Keep chat moderator actively highlighting engaged viewers',
+        ],
+      },
+      {
+        name: 'Phase 3 — Presenter Energy Audit',
+        actions: [
+          'Review own replay — flag any 5-min stretch where energy drops',
+          'Stand during delivery if not already',
+          'Move / gesture — static presenters lose attention faster',
+          'Vary tone: whisper-normal-loud pattern, not monotone',
+        ],
+      },
+      {
+        name: 'Phase 4 — Pitch Transition',
+        actions: [
+          'Test moving pitch earlier (40 min vs 60 min)',
+          'Deploy "permission to close" frame right before pitch',
+          'Measure attendance at each 10-min mark to find drop cliff',
+          'Target: 75%+ pitch attendance within 2 webinars',
+        ],
+      },
+    ],
+    tools: ['WebinarJam (attendance timeline)', 'Fathom (replay review)', 'SOP 4 template'],
+    expectedLift: '+10-15% pitch attendance within 2 webinars of restructure',
+  },
+  callShowRate: {
+    diagnosis: 'Call show rate under 60% means leads are ghosting between booking and the call. Fix: setter follow-up speed, day-of reminder cadence, and perceived setter authenticity all drive this.',
+    sopRef: 'SOP 18 (Ultimate Sales Guide) + SOP 1 (Hydra Strategy) + Acquisition Lead Nurture Playbook',
+    rootCauses: [
+      { cause: 'No setter follow-up after booking', signal: 'Booked lead gets zero touches until call time' },
+      { cause: 'Reminder cadence too light', signal: 'Only 1-2 reminders between booking and call' },
+      { cause: 'Setter perceived as sleazy/unprofessional', signal: 'Low reply rate to setter messages' },
+      { cause: 'Call slot timing bad', signal: 'Calls booked during work hours with no flexibility' },
+    ],
+    phases: [
+      {
+        name: 'Phase 1 — Selfie Video Follow-Up (Day 1)',
+        actions: [
+          'Setter records personalized selfie video within 1hr of booking',
+          'Script: name, acknowledgment of booking, what to expect, 1 question to prep',
+          'Keep under 60 seconds, send via preferred platform (SMS/WhatsApp/iMessage)',
+          'This alone can add 10-15% show rate per Jeremy Haynes',
+        ],
+      },
+      {
+        name: 'Phase 2 — Day-Of Reminder Stack',
+        actions: [
+          'Morning-of text: "Excited for our call at [time]! Here\'s the Zoom link: [link]"',
+          '1-hour-before text: "Jumping on in 1 hour — any last questions?"',
+          '10-minute-before: "Hopping in now, see you shortly"',
+          'Send from iPhone/iMessage if possible — higher read rates than carrier SMS',
+        ],
+      },
+      {
+        name: 'Phase 3 — Setter Audit',
+        actions: [
+          'Screen-share each setter\'s message history to identify quality variance',
+          'Check: profile photo quality, tonality, personalization, typos',
+          'Compare show rates by setter — 20%+ variance means one is failing',
+          'Retrain or replace setters with show rates below team average',
+        ],
+      },
+      {
+        name: 'Phase 4 — Call Slot Expansion',
+        actions: [
+          'Add slots 7am-9am and 5pm-8pm local time',
+          'Add Saturday morning slots (10am-2pm)',
+          'Offer rescheduling 1x automatically without friction',
+          'Target: 65-75% call show rate within 14 days',
+        ],
+      },
+    ],
+    tools: ['Close CRM (setter analytics)', 'Loom / Fathom (selfie videos)', 'GHL SMS', 'Calendly'],
+    expectedLift: '+10-15% call show rate within 14 days of selfie video + reminder stack',
+  },
+  cashCollected: {
+    diagnosis: 'Cash collected below 65% of list price means you\'re financing too much of the deal. Clients default on plans, and you\'re carrying the risk. Fix offer structure, PIF discount, and down-sell mechanics.',
+    sopRef: 'Acquisition.com Pricing Playbook + SOP 4 (Mastering Webinars offer construction)',
+    rootCauses: [
+      { cause: 'No PIF discount', signal: 'Everyone takes payment plan, no upfront cash incentive' },
+      { cause: 'Payment plan too long', signal: '12+ month plans stretching collection' },
+      { cause: 'No order bump / upsell', signal: 'Single-offer transactions, no stack' },
+      { cause: 'No down-sell path', signal: 'Lost deals walk away with $0 instead of lower tier' },
+    ],
+    phases: [
+      {
+        name: 'Phase 1 — Add PIF Discount (Day 1)',
+        actions: [
+          'Offer 10-20% discount for pay-in-full at close',
+          'Frame as "save $X today" not "pay more later"',
+          'Train closers to lead with PIF option, payment plan is fallback',
+          'Anchor full price first, then reveal PIF discount as exclusive',
+        ],
+      },
+      {
+        name: 'Phase 2 — Shorten Payment Plans',
+        actions: [
+          'Move 12-month plans to 6-month max',
+          'Move 6-month plans to 3-month max when possible',
+          'Require 30-50% down payment on all plans',
+          'Cut ultra-long plans entirely if collection risk is high',
+        ],
+      },
+      {
+        name: 'Phase 3 — Order Bump / Upsell',
+        actions: [
+          'Add $500-$2000 order bump at checkout (done-for-you asset, bonus coaching call, template pack)',
+          'Deploy 1-click upsell after close: "Want to add [X] for [Y]?"',
+          'Test bump acceptance rate — target 25-40% take rate',
+        ],
+      },
+      {
+        name: 'Phase 4 — Down-Sell for Lost Deals',
+        actions: [
+          'Build a lower-tier offer for deals that say "can\'t afford it"',
+          'Price at 30-50% of flagship, with clear ascension path back up',
+          'Train closers on specific "can I offer you something smaller?" pivot',
+          'Target: 80-90% cash collected vs contract value',
+        ],
+      },
+    ],
+    tools: ['Stripe (deposit processing)', 'Whop (payment plans)', 'Close CRM (deal tracking)', 'Hormozi Pricing Playbook'],
+    expectedLift: '+15-25% cash collected within 30 days of offer restructure',
+  },
+  roas: {
+    diagnosis: 'ROAS is downstream of every other stat. If ROAS is bad, the bottleneck is somewhere else in the funnel. Find the upstream choke point first.',
+    sopRef: 'Jeremy Haynes Bottleneck Analysis SOP',
+    rootCauses: [
+      { cause: 'One or more upstream stats choked', signal: 'ROAS reflects the weakest link' },
+      { cause: 'Cash collected too low', signal: 'Contract value looks good but cash is financed' },
+      { cause: 'CAC too high relative to AOV', signal: 'Spending $500 to close a $2K offer' },
+    ],
+    phases: [
+      {
+        name: 'Phase 1 — Identify Upstream Bottleneck',
+        actions: [
+          'Run full bottleneck analysis — ROAS is never the bottleneck itself',
+          'Rank all stats by gap-to-Good — attack #1 first',
+          'Usually: booking rate, close rate, or opt-in rate is the real issue',
+        ],
+      },
+      {
+        name: 'Phase 2 — Fix That, Not ROAS',
+        actions: [
+          'Don\'t optimize ROAS directly — optimize the root stat',
+          'Cheap CPM "fixes" usually tank downstream quality and kill ROAS anyway',
+          'Fix upstream, ROAS fixes itself within 2-4 weeks',
+        ],
+      },
+    ],
+    tools: ['Jeremy Haynes Bottleneck Analyzer', 'Full funnel analytics'],
+    expectedLift: 'ROAS is a lagging indicator. Fix upstream stats and ROAS follows within 14-30 days.',
+  },
+  vslPlayRate: {
+    diagnosis: 'VSL play rate under 65% means viewers are landing on the page and not pressing play. Usually a thumbnail, above-fold, or auto-play issue.',
+    sopRef: 'SOP 3 (Mastering VSLs) + SOP 28 (Confirmation Page Best Practices)',
+    rootCauses: [{ cause: 'Weak thumbnail', signal: 'Default black frame or generic shot' }, { cause: 'VSL below the fold', signal: 'Viewers scroll past before seeing it' }, { cause: 'No play prompt', signal: 'No arrow, no text telling them to watch' }],
+    phases: [
+      { name: 'Phase 1 — Custom Thumbnail', actions: ['Use host\'s face with bold text overlay', 'Add a play button graphic if not present', 'Test 3 thumbnails over 7 days'] },
+      { name: 'Phase 2 — Above-Fold Positioning', actions: ['VSL must be visible without scrolling', 'Reduce text above video', 'Mobile check: VSL visible in first viewport'] },
+      { name: 'Phase 3 — Auto-Play Testing', actions: ['Test auto-play muted vs manual', 'Track downstream: do auto-plays complete at same rate?', 'Keep whichever drives more applications'] },
+    ],
+    tools: ['Wistia', 'Vimeo', 'GHL'],
+    expectedLift: '+10-15% play rate within 7 days',
+  },
+  vslCompletion: {
+    diagnosis: 'VSL completion under 30% means the first 30 seconds don\'t hook hard enough. Long-form VSLs live or die in the opening.',
+    sopRef: 'SOP 3 (Mastering VSLs) + 100M Hooks Playbook',
+    rootCauses: [{ cause: 'Weak first 30 seconds', signal: 'Drop-off at 0:30 mark' }, { cause: 'Slow pacing', signal: 'Retention curve flat or declining' }, { cause: 'Proof placed too late', signal: 'Strongest proof after minute 10' }],
+    phases: [
+      { name: 'Phase 1 — Rewrite First 30 Seconds', actions: ['Start with pattern interrupt (unexpected statement, visual)', 'Promise specific outcome in first 10 seconds', 'Include biggest proof point in first 30 sec'] },
+      { name: 'Phase 2 — Tighten Pacing', actions: ['Cut 15-20% of runtime — usually filler', 'Remove repetitive mechanism explanations', 'Shorter = better completion'] },
+      { name: 'Phase 3 — Front-Load Proof', actions: ['Strongest case study in first 3 min', 'Credentials/authority markers in first 90 sec', 'Save technical mechanism for after hook + proof'] },
+    ],
+    tools: ['Wistia retention analytics', 'Adobe Premiere', 'SOP 3 template'],
+    expectedLift: '+8-12% completion within 14 days of re-edit',
+  },
+  appSubmission: {
+    diagnosis: 'Application rate under 10% means viewers watched the VSL but didn\'t submit. Usually friction in the form or unclear CTA.',
+    sopRef: 'SOP 3 + SOP 16 (DSL Strategy)',
+    rootCauses: [{ cause: 'Form too long', signal: '10+ questions' }, { cause: 'CTA unclear post-VSL', signal: 'Viewer doesn\'t know what happens next' }, { cause: 'Mobile friction', signal: 'Form not thumb-optimized' }],
+    phases: [
+      { name: 'Phase 1 — Shorten Form', actions: ['Cut to 3-5 essential qualifying questions', 'Remove anything not used by closer on call', 'Test single-page vs multi-step'] },
+      { name: 'Phase 2 — Clarify CTA', actions: ['Explicit next-step copy: "Apply → Book Call → Get Custom Plan"', 'Button copy specific: "Apply Now" not "Submit"', 'Add trust elements near form'] },
+      { name: 'Phase 3 — Mobile-First Check', actions: ['Test form on iPhone SE (smallest common screen)', 'Thumb-reach zone for all buttons', 'Inline validation, not error pages'] },
+    ],
+    tools: ['Typeform', 'GHL', 'Hotjar'],
+    expectedLift: '+5-10% app submission within 7 days',
+  },
+  appToBooked: {
+    diagnosis: 'App-to-booked below 60% means people applied but didn\'t book a call. Friction in calendar or poor slot availability.',
+    sopRef: 'SOP 1 (Hydra Strategy) + Calendar optimization',
+    rootCauses: [{ cause: 'Limited call slots', signal: 'Only business-hours availability' }, { cause: 'Calendar loads slow', signal: '3+ seconds to load' }, { cause: 'No post-app follow-up', signal: 'Silent between app and call booking' }],
+    phases: [
+      { name: 'Phase 1 — Expand Slots', actions: ['Add 7am-9am and 5pm-8pm slots', 'Add Saturday 10am-2pm', 'Test 2-week booking window vs 1-week'] },
+      { name: 'Phase 2 — Auto-Reminder', actions: ['If app submitted but no booking in 15 min, trigger SMS', 'Message: "Saw your app! Grab a time here: [link]"', 'Follow up 3 times over 48hr if still no booking'] },
+      { name: 'Phase 3 — Calendar Speed', actions: ['Use Calendly (faster) or GHL native calendar', 'Direct-embed vs pop-up', 'Reduce booking flow to 60 seconds end-to-end'] },
+    ],
+    tools: ['Calendly', 'GHL', 'Twilio (SMS automation)'],
+    expectedLift: '+10-15% app-to-booked within 7 days',
+  },
+  videoViews: { diagnosis: 'Avg video views are slow-moving. Needs 30-90 days of consistent output to move.', sopRef: 'YouTube content engine strategy', rootCauses: [{ cause: 'Low upload frequency', signal: 'Less than 1 video per week' }, { cause: 'Weak thumbnails', signal: 'CTR under 5%' }], phases: [{ name: 'Phase 1 — Increase Frequency', actions: ['Post 2-3 videos per week minimum', 'Batch record 4-6 videos per session'] }, { name: 'Phase 2 — Thumbnail Tests', actions: ['A/B test with TubeBuddy', 'Use face + bold text formula'] }], tools: ['YouTube Studio', 'TubeBuddy', 'VidIQ'], expectedLift: '+50-100% avg views over 90 days' },
+  viewToClick: { diagnosis: 'View-to-click under 2% means viewers aren\'t converting from YouTube to your landing page.', sopRef: 'T5 YouTube content engine SOP', rootCauses: [{ cause: 'Weak CTA', signal: 'No verbal prompt in video' }, { cause: 'Description CTA buried', signal: 'Link below fold in description' }], phases: [{ name: 'Phase 1 — Verbal CTA at 60% Mark', actions: ['Not just end of video', 'Specific action + benefit'] }, { name: 'Phase 2 — Pinned Comment', actions: ['Link + 1-sentence benefit', 'Pin within first hour of upload'] }], tools: ['YouTube Studio', 'UTM tracking'], expectedLift: '+1-2% CTR within 14 days' },
+  reach: { diagnosis: 'Low reach means content isn\'t getting distributed. Algorithm or consistency issue.', sopRef: 'IG/TikTok content strategy', rootCauses: [{ cause: 'Inconsistent posting', signal: 'Gaps of 3+ days' }, { cause: 'Weak hooks first 1-2 sec', signal: 'Drop-off above 50% in opening' }], phases: [{ name: 'Phase 1 — Consistency', actions: ['Post 2x daily for 30 days straight', 'Same posting times each day'] }, { name: 'Phase 2 — Hook Rewrites', actions: ['Rewrite first 1 sec of top 5 posts', 'Pattern interrupts'] }], tools: ['IG Insights', 'TikTok Analytics'], expectedLift: '+30-50% reach within 30 days' },
+  engagementRate: { diagnosis: 'Engagement rate under 2% means content isn\'t prompting interaction.', sopRef: 'Content engagement SOP', rootCauses: [{ cause: 'No question in caption', signal: 'Statements only, no prompts' }, { cause: 'Slow comment reply', signal: 'Replies 6+ hours later' }], phases: [{ name: 'Phase 1 — Comment Prompts', actions: ['End every post with direct question', 'Polarizing opinion > neutral info'] }, { name: 'Phase 2 — Reply Speed', actions: ['Reply to every comment in first hour', 'Ask follow-up questions in replies'] }], tools: ['IG native', 'TikTok native'], expectedLift: '+1-3% engagement within 14 days' },
+  dmOpenRate: { diagnosis: 'DM open rate under 50% means first messages aren\'t compelling.', sopRef: 'Growth operator outreach SOP', rootCauses: [{ cause: 'Generic openers', signal: 'Copy-paste messages' }, { cause: 'Weak profile', signal: 'No authority signals on sender profile' }], phases: [{ name: 'Phase 1 — Personalize', actions: ['Reference their content/profile in first line', 'Under 2 sentences'] }, { name: 'Phase 2 — Send Timing', actions: ['9-11am their timezone', 'Avoid weekends for cold'] }], tools: ['ManyChat', 'IG native'], expectedLift: '+10-15% open rate within 7 days' },
+  dmReplyRate: { diagnosis: 'DM reply rate under 10% means opens aren\'t converting to conversations.', sopRef: 'Growth operator outreach SOP', rootCauses: [{ cause: 'Pitching too early', signal: 'Pitch in message 1 or 2' }, { cause: 'Weak opener question', signal: 'Yes/no questions instead of open-ended' }], phases: [{ name: 'Phase 1 — Value-First', actions: ['Never pitch in first 2 messages', 'Lead with question about their business'] }, { name: 'Phase 2 — Follow-Up Cadence', actions: ['3 follow-ups spaced 2-3 days apart', 'Different angle each follow-up'] }], tools: ['ManyChat', 'IG', 'Close CRM'], expectedLift: '+5-10% reply rate within 14 days' },
+  replyToBooked: { diagnosis: 'Reply-to-booked under 15% means conversations aren\'t converting to calls.', sopRef: 'Growth operator DM close SOP', rootCauses: [{ cause: 'Calendar link too early', signal: 'Dropping link in message 2-3' }, { cause: 'No trust build before pitch', signal: 'Going straight to sell' }], phases: [{ name: 'Phase 1 — Voice Notes', actions: ['2-3 voice notes before calendar link', 'Voice = intimacy = trust'] }, { name: 'Phase 2 — Preempt Objections', actions: ['Frame as "no-pressure intro call"', 'Address price before they ask'] }], tools: ['IG voice notes', 'Calendly', 'Close CRM'], expectedLift: '+10-15% reply-to-booked within 14 days' },
+  listSize: { diagnosis: 'List growth is a slow-moving asset. Compounds over months, not weeks.', sopRef: 'T5 list building strategy', rootCauses: [{ cause: 'No lead magnet', signal: 'No reason to opt in' }, { cause: 'Missing CTAs across platforms', signal: 'YouTube/IG not funneling to email' }], phases: [{ name: 'Phase 1 — Lead Magnet', actions: ['Free training, template, or swipe file', 'Solves one specific problem'] }, { name: 'Phase 2 — Omnichannel CTAs', actions: ['Every YouTube video description has opt-in link', 'Pinned comments on all posts', 'IG bio link to lead magnet'] }], tools: ['Kit', 'GHL', 'ConvertKit'], expectedLift: '+25-50% list growth per quarter' },
+  emailOpenRate: { diagnosis: 'Open rate under 20% signals deliverability issues or weak subject lines.', sopRef: 'SOP 13 (Email Matrix)', rootCauses: [{ cause: 'List hygiene issue', signal: 'Cold contacts tanking deliverability' }, { cause: 'Generic subject lines', signal: 'Same format every email' }], phases: [{ name: 'Phase 1 — List Scrub', actions: ['Remove anyone who hasn\'t opened in 90 days', 'Run NeverBounce quarterly', 'Suppress hard bounces'] }, { name: 'Phase 2 — Subject Line Testing', actions: ['A/B test 3 subject lines per send', 'Curiosity > direct on cold', 'Specificity > vague'] }], tools: ['Kit', 'NeverBounce', 'ConvertKit'], expectedLift: '+5-10% open rate within 30 days' },
+  emailClickRate: { diagnosis: 'Email CTR under 2% means opens aren\'t driving action.', sopRef: 'SOP 13 (Email Matrix)', rootCauses: [{ cause: 'Multiple CTAs', signal: 'Email has 3+ different links' }, { cause: 'Email too long', signal: '500+ words for promo emails' }], phases: [{ name: 'Phase 1 — Single CTA', actions: ['One action per email, repeat 2-3x', 'Button + text link for redundancy'] }, { name: 'Phase 2 — Length Test', actions: ['Promo emails under 200 words', 'Value emails can be longer (value-dense)'] }], tools: ['Kit', 'Email analytics'], expectedLift: '+1-2% CTR within 14 days' },
+  regRate: { diagnosis: 'List-to-registration under 3% means your promo sequence isn\'t converting subscribers.', sopRef: 'SOP 13 (Email Matrix) + Webinar promo sequence', rootCauses: [{ cause: 'Single-email promo', signal: 'Only 1 email sent about webinar' }, { cause: 'No urgency/scarcity', signal: 'No deadline mentioned' }], phases: [{ name: 'Phase 1 — 4-Email Sequence', actions: ['Email 1: Teaser', 'Email 2: Social proof/case study', 'Email 3: Urgency (spots filling)', 'Email 4: Final call (closing tonight)'] }, { name: 'Phase 2 — Add Scarcity', actions: ['"Only X spots left" in final 24hr', 'Real deadline, not fake urgency', 'Close registration after webinar starts'] }], tools: ['Kit sequences', 'WebinarJam', 'GHL'], expectedLift: '+3-5% reg rate within 1 promo cycle' },
+};
+
+function getTier(value, benchmark) {
+  if (value === null || value === undefined || isNaN(value) || value === '') return null;
+  const v = parseFloat(value);
+  if (benchmark.inverse) {
+    if (v >= benchmark.critical) return 'critical';
+    if (v >= benchmark.poor) return 'poor';
+    if (v >= benchmark.average) return 'average';
+    if (v >= benchmark.good) return 'good';
+    return 'elite';
+  } else {
+    if (v < benchmark.critical) return 'critical';
+    if (v < benchmark.poor) return 'poor';
+    if (v < benchmark.average) return 'average';
+    if (v < benchmark.good) return 'good';
+    return 'elite';
+  }
+}
+
+const TIER_GAPS = { critical: 4, poor: 3, average: 2, good: 1, elite: 0 };
+const TIER_COLORS = { critical: '#ff3131', poor: '#ff7a00', average: '#ffd60a', good: '#7cff6b', elite: '#00ffc2' };
+
+export default function BottleneckAnalyzer() {
+  const [funnelType, setFunnelType] = useState('webinar');
+  const [inputs, setInputs] = useState({});
+  const [expandedStat, setExpandedStat] = useState(null);
+  const [calcValues, setCalcValues] = useState({});
+  const [solvingBottleneck, setSolvingBottleneck] = useState(null);
+
+  const benchmarks = BENCHMARKS[funnelType];
+  const statKeys = Object.keys(benchmarks);
+
+  const handleInput = (key, value) => setInputs({ ...inputs, [key]: value });
+  const handleCalcInput = (statKey, fieldKey, value) => setCalcValues({ ...calcValues, [statKey]: { ...(calcValues[statKey] || {}), [fieldKey]: parseFloat(value) || 0 } });
+  const applyCalculated = (statKey) => {
+    const calc = CALCULATORS[statKey];
+    if (!calc) return;
+    const result = calc.calc(calcValues[statKey] || {});
+    if (result > 0) { handleInput(statKey, result.toFixed(2)); setExpandedStat(null); }
+  };
+
+  const analysis = useMemo(() => {
+    const results = statKeys.map((key) => {
+      const val = inputs[key];
+      const bench = benchmarks[key];
+      const tier = getTier(val, bench);
+      const meta = STAT_META[key] || { ease: 3, risk: 3, impact: 3 };
+      const gap = tier ? TIER_GAPS[tier] : 0;
+      const priorityScore = gap > 0 ? (gap * meta.impact * meta.ease) / meta.risk : 0;
+      return { key, label: bench.label, value: val, tier, bench, meta, gap, priorityScore };
+    });
+    return results.sort((a, b) => b.priorityScore - a.priorityScore);
+  }, [inputs, funnelType, benchmarks, statKeys]);
+
+  const topBottlenecks = analysis.filter((r) => r.priorityScore > 0).slice(0, 3);
+  const filledCount = statKeys.filter((k) => inputs[k] !== undefined && inputs[k] !== '').length;
+  const hasData = filledCount > 0;
+  const reset = () => { setInputs({}); setCalcValues({}); setExpandedStat(null); };
+  const formatNumber = (val, format) => {
+    if (!val) return '';
+    const n = parseFloat(val);
+    if (format === '' && n >= 1000) return n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : `${(n / 1000).toFixed(1)}K`;
+    return val;
+  };
+
+  const activeSolvePlan = solvingBottleneck ? { stat: topBottlenecks.find(b => b.key === solvingBottleneck), plan: SOLVE_PLANS[solvingBottleneck] } : null;
+
+  return (
+    <div style={S.root}>
+      <style>{css}</style>
+
+      {/* MODAL: SOLVE BOTTLENECK */}
+      {activeSolvePlan && activeSolvePlan.stat && activeSolvePlan.plan && (
+        <div style={S.modalOverlay} onClick={() => setSolvingBottleneck(null)}>
+          <div style={S.modalContainer} onClick={(e) => e.stopPropagation()}>
+            <div style={S.modalHeader}>
+              <div>
+                <div style={S.modalLabel}>SOLVING BOTTLENECK</div>
+                <div style={S.modalTitle}>{activeSolvePlan.stat.label}</div>
+                <div style={S.modalMeta}>
+                  <span style={{ color: TIER_COLORS[activeSolvePlan.stat.tier] }}>
+                    {activeSolvePlan.stat.value}{activeSolvePlan.stat.bench.format === '%' ? '%' : activeSolvePlan.stat.bench.format === 'x' ? 'x' : ''} · {activeSolvePlan.stat.tier.toUpperCase()}
+                  </span>
+                  <span style={S.modalDivider}>→</span>
+                  <span style={{ color: TIER_COLORS.good }}>
+                    TARGET: {activeSolvePlan.stat.bench.inverse ? `<${activeSolvePlan.stat.bench.good}` : `${activeSolvePlan.stat.bench.good}+`}{activeSolvePlan.stat.bench.format === '%' ? '%' : activeSolvePlan.stat.bench.format === 'x' ? 'x' : ''}
+                  </span>
+                </div>
+              </div>
+              <button onClick={() => setSolvingBottleneck(null)} style={S.modalClose}>✕</button>
+            </div>
+
+            <div style={S.modalBody}>
+              <div style={S.diagnosisBlock}>
+                <div style={S.blockLabel}>DIAGNOSIS</div>
+                <div style={S.diagnosisText}>{activeSolvePlan.plan.diagnosis}</div>
+                <div style={S.sopRef}>REFERENCE: {activeSolvePlan.plan.sopRef}</div>
+              </div>
+
+              <div style={S.rootCausesBlock}>
+                <div style={S.blockLabel}>ROOT CAUSES · MATCH THE SIGNAL TO YOUR REALITY</div>
+                {activeSolvePlan.plan.rootCauses && activeSolvePlan.plan.rootCauses.map((rc, i) => (
+                  <div key={i} style={S.rootCauseRow}>
+                    <div style={S.rootCauseName}>{rc.cause}</div>
+                    <div style={S.rootCauseSignal}>→ {rc.signal}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={S.phasesBlock}>
+                <div style={S.blockLabel}>EXECUTION PLAN</div>
+                {activeSolvePlan.plan.phases.map((phase, i) => (
+                  <div key={i} style={S.phaseCard}>
+                    <div style={S.phaseHeader}>
+                      <div style={S.phaseNumber}>{i + 1}</div>
+                      <div style={S.phaseName}>{phase.name}</div>
+                    </div>
+                    <div style={S.phaseActions}>
+                      {phase.actions.map((action, j) => (
+                        <div key={j} style={S.phaseAction}>
+                          <span style={S.phaseBullet}>→</span>
+                          <span>{action}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={S.footerBlock}>
+                <div style={S.footerRow}>
+                  <div style={S.footerCol}>
+                    <div style={S.footerColLabel}>TOOLS NEEDED</div>
+                    <div style={S.toolsList}>
+                      {activeSolvePlan.plan.tools && activeSolvePlan.plan.tools.map((t, i) => (
+                        <span key={i} style={S.toolPill}>{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div style={S.expectedLift}>
+                  <span style={S.liftLabel}>EXPECTED LIFT:</span> {activeSolvePlan.plan.expectedLift}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={S.topBar}>
+        <div style={S.brand}>
+          <span style={S.brandMark}>T5</span>
+          <span style={S.brandDot}>●</span>
+          <span style={S.brandText}>BOTTLENECK.ANALYZER</span>
+        </div>
+        <div style={S.statusBar}>
+          <span style={S.statusDot} />
+          <span>{filledCount}/{statKeys.length} STATS</span>
+        </div>
+      </div>
+
+      <div style={S.funnelBar}>
+        {Object.entries(FUNNEL_CATEGORIES).map(([catKey, cat]) => (
+          <div key={catKey} style={S.funnelGroup}>
+            <span style={S.funnelGroupLabel}>{cat.label}</span>
+            <div style={S.funnelTabs}>
+              {cat.funnels.map((f) => (
+                <button key={f.id} onClick={() => { setFunnelType(f.id); setInputs({}); setCalcValues({}); setExpandedStat(null); }} style={{ ...S.tab, ...(funnelType === f.id ? S.tabActive : {}) }}>
+                  {f.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={S.mainGrid}>
+        <div style={S.leftPanel}>
+          <div style={S.panelHeader}>
+            <span style={S.panelLabel}>INPUT STATS</span>
+            {hasData && <button onClick={reset} style={S.resetBtn}>RESET</button>}
+          </div>
+          <div style={S.helpHint}>
+            <span>Click </span>
+            <span style={S.helpIconInline}>?</span>
+            <span> on any stat to see the formula + calculator</span>
+          </div>
+          <div style={S.inputList}>
+            {statKeys.map((key) => {
+              const bench = benchmarks[key];
+              const val = inputs[key];
+              const tier = getTier(val, bench);
+              const formula = FORMULAS[key];
+              const calculator = CALCULATORS[key];
+              const isExpanded = expandedStat === key;
+              const cv = calcValues[key] || {};
+              const calcResult = calculator ? calculator.calc(cv) : 0;
+
+              return (
+                <div key={key} style={S.inputRowWrapper}>
+                  <div style={S.inputRow}>
+                    <div style={S.inputRowLeft}>
+                      <div style={S.inputLabelWrap}>
+                        <span style={S.inputLabel}>{bench.label}</span>
+                        {formula && (
+                          <button onClick={() => setExpandedStat(isExpanded ? null : key)} style={{ ...S.helpIcon, ...(isExpanded ? S.helpIconActive : {}) }} title="Show formula & calculator">?</button>
+                        )}
+                      </div>
+                      <div style={S.inputBench}>GOOD: {bench.inverse ? `<${bench.good}` : `${bench.good}+`}{bench.format}</div>
+                    </div>
+                    <div style={S.inputRight}>
+                      <div style={S.inputWrap}>
+                        {bench.format === '$' && <span style={S.inputPrefix}>$</span>}
+                        <input type="number" step="0.01" value={val || ''} onChange={(e) => handleInput(key, e.target.value)} placeholder="—" style={{ ...S.input, paddingLeft: bench.format === '$' ? '22px' : '14px', borderColor: tier ? TIER_COLORS[tier] : '#2a2a2a' }} />
+                        {(bench.format === '%' || bench.format === 'x') && <span style={S.inputSuffix}>{bench.format}</span>}
+                      </div>
+                      {tier && <div style={{ ...S.tierPill, background: TIER_COLORS[tier], color: '#000' }}>{tier.toUpperCase().slice(0, 4)}</div>}
+                    </div>
+                  </div>
+
+                  {isExpanded && formula && (
+                    <div style={S.helpPanel}>
+                      <div style={S.helpSection}>
+                        <div style={S.helpSectionLabel}>FORMULA</div>
+                        <div style={S.helpFormula}>{formula.formula}</div>
+                      </div>
+                      <div style={S.helpSection}>
+                        <div style={S.helpSectionLabel}>WHERE TO FIND</div>
+                        <div style={S.helpText}>{formula.where}</div>
+                      </div>
+                      {formula.note && (
+                        <div style={S.helpSection}>
+                          <div style={S.helpSectionLabel}>NOTE</div>
+                          <div style={S.helpText}>{formula.note}</div>
+                        </div>
+                      )}
+                      {calculator && (
+                        <div style={S.calcSection}>
+                          <div style={S.helpSectionLabel}>CALCULATE IT</div>
+                          <div style={S.calcFields}>
+                            {calculator.fields.map((f) => (
+                              <div key={f.key} style={S.calcField}>
+                                <label style={S.calcLabel}>{f.label}</label>
+                                <div style={S.calcInputWrap}>
+                                  {f.prefix && <span style={S.calcPrefix}>{f.prefix}</span>}
+                                  <input type="number" step="0.01" value={cv[f.key] || ''} onChange={(e) => handleCalcInput(key, f.key, e.target.value)} placeholder="0" style={{ ...S.calcInput, paddingLeft: f.prefix ? '20px' : '10px' }} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {calcResult > 0 && (
+                            <div style={S.calcResult}>
+                              <span style={S.calcResultLabel}>=</span>
+                              <span style={S.calcResultValue}>{bench.format === '$' && '$'}{calcResult.toFixed(2)}{bench.format === '%' && '%'}{bench.format === 'x' && 'x'}</span>
+                              <button onClick={() => applyCalculated(key)} style={S.applyBtn}>USE THIS →</button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={S.rightPanel}>
+          {!hasData ? (
+            <div style={S.emptyState}>
+              <div style={S.emptyMark}>→</div>
+              <div style={S.emptyTitle}>PLUG IN YOUR STATS</div>
+              <div style={S.emptyText}>Input your metrics on the left. Click the "?" icon for formulas and a built-in calculator if you need help finding a stat.</div>
+            </div>
+          ) : (
+            <>
+              <div style={S.panelHeader}>
+                <span style={S.panelLabel}>SCORECARD</span>
+                <span style={S.panelSubLabel}>{filledCount} of {statKeys.length} tracked</span>
+              </div>
+              <div style={S.scorecard}>
+                {analysis.filter(r => r.tier).map((r) => (
+                  <div key={r.key} style={S.scoreRow}>
+                    <div style={S.scoreLabel}>{r.label}</div>
+                    <div style={S.scoreBarWrap}>
+                      <div style={{ ...S.scoreBarFill, width: `${Math.min(100, (1 - (r.gap / 4)) * 100)}%`, background: TIER_COLORS[r.tier] }} />
+                    </div>
+                    <div style={S.scoreValue}>
+                      {r.bench.format === '$' && '$'}{formatNumber(r.value, r.bench.format)}{r.bench.format === '%' && '%'}{r.bench.format === 'x' && 'x'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ ...S.panelHeader, marginTop: '20px' }}>
+                <span style={S.panelLabel}>ATTACK MODE · TOP BOTTLENECKS</span>
+              </div>
+
+              {topBottlenecks.length === 0 ? (
+                <div style={S.allGood}>
+                  <div style={S.allGoodTitle}>NO BOTTLENECKS.</div>
+                  <div style={S.allGoodText}>All tracked stats at Good/Elite tier. Scale the spend.</div>
+                </div>
+              ) : (
+                <div style={S.bottleneckList}>
+                  {topBottlenecks.map((r, idx) => {
+                    const pb = PLAYBOOKS[r.key] || { substats: [], tests: [], warning: '' };
+                    const hasSolvePlan = !!SOLVE_PLANS[r.key];
+                    return (
+                      <div key={r.key} style={S.bnCard}>
+                        <div style={S.bnTop}>
+                          <div style={S.bnRank}>#{idx + 1}</div>
+                          <div style={S.bnInfo}>
+                            <div style={S.bnTitle}>{r.label}</div>
+                            <div style={S.bnMeta}>
+                              <span style={{ color: TIER_COLORS[r.tier] }}>{formatNumber(r.value, r.bench.format)}{r.bench.format === '%' ? '%' : r.bench.format === 'x' ? 'x' : ''} · {r.tier.toUpperCase()}</span>
+                              <span style={S.bnMetaDivider}>|</span>
+                              <span>TARGET: {r.bench.inverse ? `<${r.bench.good}` : `${r.bench.good}+`}{r.bench.format === '%' ? '%' : r.bench.format === 'x' ? 'x' : ''}</span>
+                              <span style={S.bnMetaDivider}>|</span>
+                              <span>SCORE: {r.priorityScore.toFixed(1)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={S.bnBody}>
+                          <div style={S.bnCol}>
+                            <div style={S.bnColLabel}>INVESTIGATE</div>
+                            {pb.substats.map((s, i) => <div key={i} style={S.bnItem}>· {s}</div>)}
+                          </div>
+                          <div style={S.bnCol}>
+                            <div style={S.bnColLabel}>TEST THIS WEEK</div>
+                            {pb.tests.map((t, i) => <div key={i} style={S.bnItem}>→ {t}</div>)}
+                          </div>
+                        </div>
+                        {pb.warning && (
+                          <div style={S.bnWarning}>
+                            <span style={S.bnWarningLabel}>RISK:</span> {pb.warning}
+                          </div>
+                        )}
+                        {hasSolvePlan && (
+                          <button onClick={() => setSolvingBottleneck(r.key)} style={S.solveBtn}>
+                            SOLVE THIS BOTTLENECK →
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      <div style={S.footer}>
+        <span style={S.footerText}>ONE STAT AT A TIME · ATTACK #1 UNTIL FIXED · THEN MOVE TO #2</span>
+      </div>
+    </div>
+  );
+}
+
+const css = `
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  @keyframes slideDown { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes modalSlideIn { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Archivo:wght@400;600;700;800;900&display=swap');
+  input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { -moz-appearance: textfield; }
+`;
+
+const S = {
+  root: { minHeight: '100vh', background: '#0a0a0a', color: '#f0f0f0', fontFamily: "'Archivo', -apple-system, sans-serif", display: 'flex', flexDirection: 'column' },
+  topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 24px', borderBottom: '1px solid #1a1a1a', background: '#0d0d0d', flexWrap: 'wrap', gap: '12px' },
+  brand: { display: 'flex', alignItems: 'center', gap: '10px', fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em' },
+  brandMark: { background: '#00ffc2', color: '#000', padding: '4px 10px', fontWeight: 900, borderRadius: '999px' },
+  brandDot: { color: '#00ffc2', animation: 'pulse 2s infinite' },
+  brandText: { color: '#888' },
+  statusBar: { display: 'flex', alignItems: 'center', gap: '8px', fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', color: '#888', letterSpacing: '0.08em', padding: '6px 14px', background: '#1a1a1a', borderRadius: '999px' },
+  statusDot: { width: '7px', height: '7px', background: '#00ffc2', borderRadius: '50%', animation: 'pulse 2s infinite' },
+  funnelBar: { display: 'flex', gap: '24px', padding: '12px 24px', background: '#0d0d0d', borderBottom: '1px solid #1a1a1a', flexWrap: 'wrap', alignItems: 'center' },
+  funnelGroup: { display: 'flex', alignItems: 'center', gap: '10px' },
+  funnelGroupLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', fontWeight: 800, color: '#555', letterSpacing: '0.15em' },
+  funnelTabs: { display: 'flex', gap: '4px' },
+  tab: { background: '#1a1a1a', border: 'none', color: '#888', padding: '7px 16px', fontSize: '10px', fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.08em', cursor: 'pointer', transition: 'all 0.12s', whiteSpace: 'nowrap', borderRadius: '999px' },
+  tabActive: { background: '#00ffc2', color: '#000' },
+  mainGrid: { display: 'grid', gridTemplateColumns: 'minmax(380px, 460px) 1fr', gap: '1px', background: '#1a1a1a', flex: 1, minHeight: 0 },
+  leftPanel: { background: '#0a0a0a', padding: '16px 20px', overflowY: 'auto' },
+  rightPanel: { background: '#0a0a0a', padding: '16px 24px', overflowY: 'auto' },
+  panelHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid #1a1a1a' },
+  panelLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 700, letterSpacing: '0.15em', color: '#00ffc2' },
+  panelSubLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#555', letterSpacing: '0.08em' },
+  resetBtn: { background: 'transparent', color: '#666', border: '1px solid #2a2a2a', padding: '5px 14px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', fontFamily: "'JetBrains Mono', monospace", cursor: 'pointer', borderRadius: '999px' },
+  helpHint: { display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 14px', background: '#0f0f0f', border: '1px solid #1f1f1f', fontSize: '11px', color: '#888', marginBottom: '12px', lineHeight: 1.4, borderRadius: '999px' },
+  helpIconInline: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', background: '#1a1a1a', color: '#00ffc2', borderRadius: '50%', fontSize: '10px', fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", margin: '0 2px' },
+  inputList: { display: 'flex', flexDirection: 'column', gap: '4px' },
+  inputRowWrapper: { borderBottom: '1px solid #141414' },
+  inputRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', gap: '12px' },
+  inputRowLeft: { flex: 1, minWidth: 0 },
+  inputLabelWrap: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' },
+  inputLabel: { fontSize: '13px', fontWeight: 600, color: '#e0e0e0' },
+  helpIcon: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', background: '#1a1a1a', color: '#666', border: 'none', borderRadius: '50%', fontSize: '10px', fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", cursor: 'pointer', transition: 'all 0.12s', padding: 0 },
+  helpIconActive: { background: '#00ffc2', color: '#000' },
+  inputBench: { fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', color: '#7cff6b', letterSpacing: '0.05em' },
+  inputRight: { display: 'flex', alignItems: 'center', gap: '6px' },
+  inputWrap: { position: 'relative', width: '100px' },
+  input: { width: '100%', background: '#050505', border: '1px solid #2a2a2a', color: '#f0f0f0', padding: '8px 24px 8px 14px', fontSize: '14px', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.15s', borderRadius: '999px' },
+  inputPrefix: { position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#555', fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', pointerEvents: 'none' },
+  inputSuffix: { position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#555', fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', pointerEvents: 'none' },
+  tierPill: { padding: '4px 10px', fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', fontWeight: 800, letterSpacing: '0.08em', minWidth: '40px', textAlign: 'center', borderRadius: '999px' },
+  helpPanel: { background: '#0a0a0a', border: '1px solid #00ffc2', padding: '14px 16px', marginBottom: '8px', animation: 'slideDown 0.18s ease-out', borderRadius: '16px' },
+  helpSection: { marginBottom: '10px' },
+  helpSectionLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', fontWeight: 700, color: '#00ffc2', letterSpacing: '0.12em', marginBottom: '4px' },
+  helpFormula: { fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: '#f0f0f0', fontWeight: 600, padding: '8px 12px', background: '#050505', border: '1px solid #1a1a1a', borderRadius: '999px' },
+  helpText: { fontSize: '11px', color: '#aaa', lineHeight: 1.5 },
+  calcSection: { marginTop: '8px', paddingTop: '10px', borderTop: '1px dashed #1f1f1f' },
+  calcFields: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' },
+  calcField: { display: 'flex', flexDirection: 'column', gap: '4px' },
+  calcLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', color: '#888', letterSpacing: '0.05em' },
+  calcInputWrap: { position: 'relative' },
+  calcInput: { width: '100%', background: '#050505', border: '1px solid #2a2a2a', color: '#f0f0f0', padding: '7px 12px', fontSize: '12px', fontFamily: "'JetBrains Mono', monospace", fontWeight: 600, outline: 'none', boxSizing: 'border-box', borderRadius: '999px' },
+  calcPrefix: { position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#555', fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', pointerEvents: 'none' },
+  calcResult: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', background: '#0a1512', border: '1px solid #00ffc2', borderRadius: '999px' },
+  calcResultLabel: { color: '#00ffc2', fontWeight: 900, fontFamily: "'JetBrains Mono', monospace", fontSize: '14px' },
+  calcResultValue: { fontFamily: "'JetBrains Mono', monospace", fontSize: '14px', fontWeight: 800, color: '#f0f0f0', flex: 1 },
+  applyBtn: { background: '#00ffc2', color: '#000', border: 'none', padding: '6px 14px', fontSize: '10px', fontWeight: 800, letterSpacing: '0.08em', fontFamily: "'JetBrains Mono', monospace", cursor: 'pointer', borderRadius: '999px' },
+  emptyState: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '400px', color: '#666' },
+  emptyMark: { fontSize: '64px', color: '#00ffc2', fontWeight: 900, lineHeight: 1, marginBottom: '20px', opacity: 0.3 },
+  emptyTitle: { fontFamily: "'JetBrains Mono', monospace", fontSize: '14px', fontWeight: 700, letterSpacing: '0.15em', color: '#888', marginBottom: '10px' },
+  emptyText: { fontSize: '13px', color: '#555', maxWidth: '340px', textAlign: 'center', lineHeight: 1.5 },
+  scorecard: { display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '20px' },
+  scoreRow: { display: 'grid', gridTemplateColumns: '150px 1fr 70px', gap: '12px', alignItems: 'center', padding: '6px 0' },
+  scoreLabel: { fontSize: '12px', color: '#ccc', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  scoreBarWrap: { height: '6px', background: '#1a1a1a', overflow: 'hidden', borderRadius: '999px' },
+  scoreBarFill: { height: '100%', transition: 'width 0.35s ease-out', borderRadius: '999px' },
+  scoreValue: { fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', fontWeight: 700, color: '#f0f0f0', textAlign: 'right' },
+  bottleneckList: { display: 'flex', flexDirection: 'column', gap: '10px' },
+  bnCard: { background: '#0f0f0f', border: '1px solid #2a2a2a', borderRadius: '16px', overflow: 'hidden' },
+  bnTop: { display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderBottom: '1px solid #1a1a1a' },
+  bnRank: { fontFamily: "'JetBrains Mono', monospace", fontSize: '28px', fontWeight: 900, color: '#00ffc2', lineHeight: 1 },
+  bnInfo: { flex: 1 },
+  bnTitle: { fontSize: '16px', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '-0.01em' },
+  bnMeta: { display: 'flex', gap: '8px', flexWrap: 'wrap', fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#888', letterSpacing: '0.04em', alignItems: 'center' },
+  bnMetaDivider: { color: '#333' },
+  bnBody: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', padding: '12px 16px' },
+  bnCol: { minWidth: 0 },
+  bnColLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', fontWeight: 700, color: '#00ffc2', letterSpacing: '0.12em', marginBottom: '8px' },
+  bnItem: { fontSize: '12px', color: '#ccc', padding: '3px 0', lineHeight: 1.4 },
+  bnWarning: { background: '#1a0d00', borderTop: '1px solid #ff7a00', padding: '8px 16px', fontSize: '11px', color: '#ffb870', lineHeight: 1.4 },
+  bnWarningLabel: { color: '#ff7a00', fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.08em', marginRight: '4px' },
+  solveBtn: { display: 'block', width: '100%', background: '#00ffc2', color: '#000', border: 'none', padding: '14px 16px', fontSize: '12px', fontWeight: 900, letterSpacing: '0.1em', fontFamily: "'JetBrains Mono', monospace", cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center' },
+  allGood: { background: '#0a1512', border: '1px solid #00ffc2', padding: '24px', textAlign: 'center', borderRadius: '16px' },
+  allGoodTitle: { fontSize: '16px', fontWeight: 900, color: '#00ffc2', marginBottom: '6px', letterSpacing: '0.02em' },
+  allGoodText: { fontSize: '12px', color: '#aaa' },
+  footer: { padding: '10px 24px', borderTop: '1px solid #1a1a1a', background: '#0d0d0d', textAlign: 'center' },
+  footerText: { fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 700, color: '#00ffc2', letterSpacing: '0.15em' },
+
+  // MODAL STYLES
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', animation: 'modalFadeIn 0.2s ease-out' },
+  modalContainer: { background: '#0a0a0a', border: '1px solid #00ffc2', borderRadius: '20px', maxWidth: '900px', width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', animation: 'modalSlideIn 0.25s ease-out', overflow: 'hidden' },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '24px 28px', borderBottom: '1px solid #1a1a1a', background: '#0d0d0d' },
+  modalLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 700, color: '#00ffc2', letterSpacing: '0.2em', marginBottom: '6px' },
+  modalTitle: { fontSize: '28px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.02em', marginBottom: '8px', lineHeight: 1 },
+  modalMeta: { display: 'flex', gap: '10px', alignItems: 'center', fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', letterSpacing: '0.05em', flexWrap: 'wrap' },
+  modalDivider: { color: '#444' },
+  modalClose: { background: '#1a1a1a', color: '#888', border: 'none', width: '36px', height: '36px', borderRadius: '50%', fontSize: '14px', cursor: 'pointer', fontWeight: 700, transition: 'all 0.15s' },
+  modalBody: { padding: '24px 28px', overflowY: 'auto', flex: 1 },
+  blockLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 700, color: '#00ffc2', letterSpacing: '0.15em', marginBottom: '12px' },
+  diagnosisBlock: { marginBottom: '24px' },
+  diagnosisText: { fontSize: '15px', color: '#e0e0e0', lineHeight: 1.6, marginBottom: '12px' },
+  sopRef: { fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#7cff6b', padding: '6px 12px', background: '#0a1512', border: '1px solid #1a2a22', borderRadius: '999px', display: 'inline-block', letterSpacing: '0.05em' },
+  rootCausesBlock: { marginBottom: '24px', padding: '16px 18px', background: '#0d0d0d', border: '1px solid #1f1f1f', borderRadius: '16px' },
+  rootCauseRow: { padding: '10px 0', borderBottom: '1px solid #1a1a1a' },
+  rootCauseName: { fontSize: '13px', fontWeight: 700, color: '#f0f0f0', marginBottom: '3px' },
+  rootCauseSignal: { fontSize: '12px', color: '#888', fontStyle: 'italic' },
+  phasesBlock: { marginBottom: '24px' },
+  phaseCard: { background: '#0d0d0d', border: '1px solid #2a2a2a', borderRadius: '16px', marginBottom: '12px', overflow: 'hidden' },
+  phaseHeader: { display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 18px', background: '#0f1a16', borderBottom: '1px solid #1a2a22' },
+  phaseNumber: { width: '32px', height: '32px', background: '#00ffc2', color: '#000', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '14px', fontFamily: "'JetBrains Mono', monospace" },
+  phaseName: { fontSize: '14px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#e0e0e0' },
+  phaseActions: { padding: '14px 18px' },
+  phaseAction: { display: 'flex', gap: '10px', padding: '6px 0', fontSize: '13px', color: '#d0d0d0', lineHeight: 1.5 },
+  phaseBullet: { color: '#00ffc2', fontWeight: 700, flexShrink: 0 },
+  footerBlock: { paddingTop: '16px', borderTop: '1px solid #1a1a1a' },
+  footerRow: { marginBottom: '14px' },
+  footerCol: {},
+  footerColLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 700, color: '#00ffc2', letterSpacing: '0.12em', marginBottom: '8px' },
+  toolsList: { display: 'flex', flexWrap: 'wrap', gap: '6px' },
+  toolPill: { padding: '4px 12px', background: '#1a1a1a', color: '#ccc', fontSize: '10px', fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.05em', borderRadius: '999px', border: '1px solid #2a2a2a' },
+  expectedLift: { padding: '12px 16px', background: '#0a1512', border: '1px solid #00ffc2', borderRadius: '12px', fontSize: '13px', color: '#f0f0f0', lineHeight: 1.5 },
+  liftLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 800, color: '#00ffc2', letterSpacing: '0.1em', marginRight: '6px' },
+};
