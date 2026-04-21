@@ -1,5 +1,169 @@
-import React, { useState, useMemo } from 'react';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>T5 Bottleneck Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Archivo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { background: #0a0a0a; color: #f0f0f0; font-family: 'Archivo', -apple-system, sans-serif; overflow-x: hidden; }
+  input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { -moz-appearance: textfield; }
+  button { font-family: inherit; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  @keyframes slideDown { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes modalSlideIn { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
+  #app { min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* Top bar */
+  .topBar { display: flex; justify-content: space-between; align-items: center; padding: 14px 24px; border-bottom: 1px solid #1a1a1a; background: #0d0d0d; flex-wrap: wrap; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; }
+  .brandMark { background: #00ffc2; color: #000; padding: 4px 10px; font-weight: 900; border-radius: 999px; }
+  .brandDot { color: #00ffc2; animation: pulse 2s infinite; }
+  .brandText { color: #888; }
+  .statusBar { display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #888; letter-spacing: 0.08em; padding: 6px 14px; background: #1a1a1a; border-radius: 999px; }
+  .statusDot { width: 7px; height: 7px; background: #00ffc2; border-radius: 50%; animation: pulse 2s infinite; }
+
+  /* Funnel bar */
+  .funnelBar { display: flex; gap: 24px; padding: 12px 24px; background: #0d0d0d; border-bottom: 1px solid #1a1a1a; flex-wrap: wrap; align-items: center; }
+  .funnelGroup { display: flex; align-items: center; gap: 10px; }
+  .funnelGroupLabel { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 800; color: #555; letter-spacing: 0.15em; }
+  .funnelTabs { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tab { background: #1a1a1a; border: none; color: #888; padding: 7px 16px; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.08em; cursor: pointer; transition: all 0.12s; white-space: nowrap; border-radius: 999px; }
+  .tab.active { background: #00ffc2; color: #000; }
+  .tab:hover:not(.active) { background: #2a2a2a; color: #ccc; }
+
+  /* Main grid */
+  .mainGrid { display: grid; grid-template-columns: minmax(380px, 460px) 1fr; gap: 1px; background: #1a1a1a; flex: 1; min-height: 0; }
+  @media (max-width: 900px) { .mainGrid { grid-template-columns: 1fr; } }
+  .leftPanel, .rightPanel { background: #0a0a0a; overflow-y: auto; }
+  .leftPanel { padding: 16px 20px; }
+  .rightPanel { padding: 16px 24px; }
+
+  .panelHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #1a1a1a; }
+  .panelLabel { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.15em; color: #00ffc2; }
+  .panelSubLabel { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #555; letter-spacing: 0.08em; }
+  .resetBtn { background: transparent; color: #666; border: 1px solid #2a2a2a; padding: 5px 14px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; font-family: 'JetBrains Mono', monospace; cursor: pointer; border-radius: 999px; }
+  .resetBtn:hover { color: #ccc; border-color: #444; }
+
+  .helpHint { display: flex; align-items: center; gap: 4px; padding: 8px 14px; background: #0f0f0f; border: 1px solid #1f1f1f; font-size: 11px; color: #888; margin-bottom: 12px; line-height: 1.4; border-radius: 999px; }
+  .helpIconInline { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; background: #1a1a1a; color: #00ffc2; border-radius: 50%; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin: 0 2px; }
+
+  .inputList { display: flex; flex-direction: column; gap: 4px; }
+  .inputRowWrapper { border-bottom: 1px solid #141414; }
+  .inputRow { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 12px; }
+  .inputRowLeft { flex: 1; min-width: 0; }
+  .inputLabelWrap { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+  .inputLabel { font-size: 13px; font-weight: 600; color: #e0e0e0; }
+  .helpIcon { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; background: #1a1a1a; color: #666; border: none; border-radius: 50%; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace; cursor: pointer; transition: all 0.12s; padding: 0; }
+  .helpIcon.active { background: #00ffc2; color: #000; }
+  .inputBench { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #7cff6b; letter-spacing: 0.05em; }
+  .inputRight { display: flex; align-items: center; gap: 6px; }
+  .inputWrap { position: relative; width: 100px; }
+  .input { width: 100%; background: #050505; border: 1px solid #2a2a2a; color: #f0f0f0; padding: 8px 24px 8px 14px; font-size: 14px; font-family: 'JetBrains Mono', monospace; font-weight: 700; outline: none; transition: border-color 0.15s; border-radius: 999px; }
+  .inputPrefix { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #555; font-family: 'JetBrains Mono', monospace; font-size: 12px; pointer-events: none; }
+  .inputSuffix { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #555; font-family: 'JetBrains Mono', monospace; font-size: 12px; pointer-events: none; }
+  .tierPill { padding: 4px 10px; font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 800; letter-spacing: 0.08em; min-width: 40px; text-align: center; border-radius: 999px; color: #000; }
+
+  .helpPanel { background: #0a0a0a; border: 1px solid #00ffc2; padding: 14px 16px; margin-bottom: 8px; animation: slideDown 0.18s ease-out; border-radius: 16px; }
+  .helpSection { margin-bottom: 10px; }
+  .helpSectionLabel { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; color: #00ffc2; letter-spacing: 0.12em; margin-bottom: 4px; }
+  .helpFormula { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f0f0f0; font-weight: 600; padding: 8px 12px; background: #050505; border: 1px solid #1a1a1a; border-radius: 999px; }
+  .helpText { font-size: 11px; color: #aaa; line-height: 1.5; }
+  .calcSection { margin-top: 8px; padding-top: 10px; border-top: 1px dashed #1f1f1f; }
+  .calcFields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .calcField { display: flex; flex-direction: column; gap: 4px; }
+  .calcLabel { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #888; letter-spacing: 0.05em; }
+  .calcInputWrap { position: relative; }
+  .calcInput { width: 100%; background: #050505; border: 1px solid #2a2a2a; color: #f0f0f0; padding: 7px 12px; font-size: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 600; outline: none; border-radius: 999px; }
+  .calcPrefix { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #555; font-family: 'JetBrains Mono', monospace; font-size: 11px; pointer-events: none; }
+  .calcResult { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: #0a1512; border: 1px solid #00ffc2; border-radius: 999px; }
+  .calcResultLabel { color: #00ffc2; font-weight: 900; font-family: 'JetBrains Mono', monospace; font-size: 14px; }
+  .calcResultValue { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 800; color: #f0f0f0; flex: 1; }
+  .applyBtn { background: #00ffc2; color: #000; border: none; padding: 6px 14px; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; font-family: 'JetBrains Mono', monospace; cursor: pointer; border-radius: 999px; }
+
+  .emptyState { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 400px; color: #666; }
+  .emptyMark { font-size: 64px; color: #00ffc2; font-weight: 900; line-height: 1; margin-bottom: 20px; opacity: 0.3; }
+  .emptyTitle { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; letter-spacing: 0.15em; color: #888; margin-bottom: 10px; }
+  .emptyText { font-size: 13px; color: #555; max-width: 340px; text-align: center; line-height: 1.5; }
+
+  .scorecard { display: flex; flex-direction: column; gap: 3px; margin-bottom: 20px; }
+  .scoreRow { display: grid; grid-template-columns: 150px 1fr 70px; gap: 12px; align-items: center; padding: 6px 0; }
+  .scoreLabel { font-size: 12px; color: #ccc; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scoreBarWrap { height: 6px; background: #1a1a1a; overflow: hidden; border-radius: 999px; }
+  .scoreBarFill { height: 100%; transition: width 0.35s ease-out; border-radius: 999px; }
+  .scoreValue { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; color: #f0f0f0; text-align: right; }
+
+  .bottleneckList { display: flex; flex-direction: column; gap: 10px; }
+  .bnCard { background: #0f0f0f; border: 1px solid #2a2a2a; border-radius: 16px; overflow: hidden; }
+  .bnTop { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-bottom: 1px solid #1a1a1a; }
+  .bnRank { font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 900; color: #00ffc2; line-height: 1; }
+  .bnInfo { flex: 1; }
+  .bnTitle { font-size: 16px; font-weight: 800; margin-bottom: 4px; text-transform: uppercase; letter-spacing: -0.01em; }
+  .bnMeta { display: flex; gap: 8px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #888; letter-spacing: 0.04em; align-items: center; }
+  .bnMetaDivider { color: #333; }
+  .bnBody { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 12px 16px; }
+  @media (max-width: 600px) { .bnBody { grid-template-columns: 1fr; } }
+  .bnCol { min-width: 0; }
+  .bnColLabel { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; color: #00ffc2; letter-spacing: 0.12em; margin-bottom: 8px; }
+  .bnItem { font-size: 12px; color: #ccc; padding: 3px 0; line-height: 1.4; }
+  .bnWarning { background: #1a0d00; border-top: 1px solid #ff7a00; padding: 8px 16px; font-size: 11px; color: #ffb870; line-height: 1.4; }
+  .bnWarningLabel { color: #ff7a00; font-weight: 800; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.08em; margin-right: 4px; }
+  .solveBtn { display: block; width: 100%; background: #00ffc2; color: #000; border: none; padding: 14px 16px; font-size: 12px; font-weight: 900; letter-spacing: 0.1em; font-family: 'JetBrains Mono', monospace; cursor: pointer; transition: all 0.15s; text-align: center; }
+  .solveBtn:hover { background: #00e0aa; }
+
+  .allGood { background: #0a1512; border: 1px solid #00ffc2; padding: 24px; text-align: center; border-radius: 16px; }
+  .allGoodTitle { font-size: 16px; font-weight: 900; color: #00ffc2; margin-bottom: 6px; letter-spacing: 0.02em; }
+  .allGoodText { font-size: 12px; color: #aaa; }
+
+  .footer { padding: 10px 24px; border-top: 1px solid #1a1a1a; background: #0d0d0d; text-align: center; }
+  .footerText { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; color: #00ffc2; letter-spacing: 0.15em; }
+
+  /* Modal */
+  .modalOverlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 24px; animation: modalFadeIn 0.2s ease-out; }
+  .modalContainer { background: #0a0a0a; border: 1px solid #00ffc2; border-radius: 20px; max-width: 900px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; animation: modalSlideIn 0.25s ease-out; overflow: hidden; }
+  .modalHeader { display: flex; justify-content: space-between; align-items: flex-start; padding: 24px 28px; border-bottom: 1px solid #1a1a1a; background: #0d0d0d; gap: 16px; }
+  .modalLabel { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; color: #00ffc2; letter-spacing: 0.2em; margin-bottom: 6px; }
+  .modalTitle { font-size: 28px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.02em; margin-bottom: 8px; line-height: 1; }
+  .modalMeta { display: flex; gap: 10px; align-items: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.05em; flex-wrap: wrap; }
+  .modalDivider { color: #444; }
+  .modalClose { background: #1a1a1a; color: #888; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 14px; cursor: pointer; font-weight: 700; transition: all 0.15s; flex-shrink: 0; }
+  .modalClose:hover { background: #2a2a2a; color: #fff; }
+  .modalBody { padding: 24px 28px; overflow-y: auto; flex: 1; }
+
+  .blockLabel { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; color: #00ffc2; letter-spacing: 0.15em; margin-bottom: 12px; }
+  .diagnosisBlock { margin-bottom: 24px; }
+  .diagnosisText { font-size: 15px; color: #e0e0e0; line-height: 1.6; margin-bottom: 12px; }
+  .sopRef { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #7cff6b; padding: 6px 12px; background: #0a1512; border: 1px solid #1a2a22; border-radius: 999px; display: inline-block; letter-spacing: 0.05em; }
+  .rootCausesBlock { margin-bottom: 24px; padding: 16px 18px; background: #0d0d0d; border: 1px solid #1f1f1f; border-radius: 16px; }
+  .rootCauseRow { padding: 10px 0; border-bottom: 1px solid #1a1a1a; }
+  .rootCauseRow:last-child { border-bottom: none; }
+  .rootCauseName { font-size: 13px; font-weight: 700; color: #f0f0f0; margin-bottom: 3px; }
+  .rootCauseSignal { font-size: 12px; color: #888; font-style: italic; }
+  .phasesBlock { margin-bottom: 24px; }
+  .phaseCard { background: #0d0d0d; border: 1px solid #2a2a2a; border-radius: 16px; margin-bottom: 12px; overflow: hidden; }
+  .phaseHeader { display: flex; align-items: center; gap: 14px; padding: 14px 18px; background: #0f1a16; border-bottom: 1px solid #1a2a22; }
+  .phaseNumber { width: 32px; height: 32px; background: #00ffc2; color: #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 14px; font-family: 'JetBrains Mono', monospace; flex-shrink: 0; }
+  .phaseName { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; color: #e0e0e0; }
+  .phaseActions { padding: 14px 18px; }
+  .phaseAction { display: flex; gap: 10px; padding: 6px 0; font-size: 13px; color: #d0d0d0; line-height: 1.5; }
+  .phaseBullet { color: #00ffc2; font-weight: 700; flex-shrink: 0; }
+  .footerBlock { padding-top: 16px; border-top: 1px solid #1a1a1a; }
+  .footerColLabel { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; color: #00ffc2; letter-spacing: 0.12em; margin-bottom: 8px; }
+  .toolsList { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .toolPill { padding: 4px 12px; background: #1a1a1a; color: #ccc; font-size: 10px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em; border-radius: 999px; border: 1px solid #2a2a2a; }
+  .expectedLift { padding: 12px 16px; background: #0a1512; border: 1px solid #00ffc2; border-radius: 12px; font-size: 13px; color: #f0f0f0; line-height: 1.5; }
+  .liftLabel { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; color: #00ffc2; letter-spacing: 0.1em; margin-right: 6px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
 // ============ BENCHMARK DATA ============
 const BENCHMARKS = {
   webinar: {
@@ -179,8 +343,6 @@ const PLAYBOOKS = {
   regRate: { substats: ['Subject specificity', 'Promise clarity', 'Urgency/scarcity', 'Social proof in sequence'], tests: ['4-email sequence: teaser → proof → urgency → final call', 'Add "only X spots left" scarcity', 'Include testimonial in email 2'], warning: 'Low risk. Multi-email sequences win 3-5x.' },
 };
 
-// ============ SOLVE PLANS ============
-// Deep-dive 4-phase plans for each bottleneck, grounded in T5 / Jeremy Haynes SOPs
 const SOLVE_PLANS = {
   showRate: {
     diagnosis: 'Show rate is the gap between registrations and live attendance. Below 35% on paid webinars usually means your reminder sequence is too light, deliverability is broken, or you\'re not framing the value of showing up live.',
@@ -192,45 +354,10 @@ const SOLVE_PLANS = {
       { cause: 'Confirmation page has no video', signal: 'Just a thank-you page, no indoctrination' },
     ],
     phases: [
-      {
-        name: 'Phase 1 — Reminder Stack (24-48hr)',
-        actions: [
-          'Build full multi-channel reminder sequence: Email + SMS + ManyChat (Hydra Strategy)',
-          'Cadence: 24hr before, 3hr before, 1hr before, 10min before',
-          'SMS must include area code matching recipient for 2x pickup rate',
-          'ManyChat flow with comment-trigger on latest post: "DM me SHOW to get the link"',
-          'Confirmation page: embedded host video + event details + "add to calendar" button',
-        ],
-      },
-      {
-        name: 'Phase 2 — Pre-Frame Content (48-72hr)',
-        actions: [
-          'Deploy Hammer Them campaign: 15-20 content pieces in 72hr window before webinar',
-          'Include in content: mechanism explanation, proof elements, one objection crush per piece',
-          'Write value-dense emails (not reminder stubs) — full story/framing inside the email body',
-          'Each email answers ONE objection or reinforces ONE belief',
-          'Include "live only" bonus mention to anchor the urgency to show live',
-        ],
-      },
-      {
-        name: 'Phase 3 — Deliverability Audit (Day 1)',
-        actions: [
-          'Verify SPF, DKIM, DMARC records on sending domain',
-          'Scrub list with NeverBounce (remove 2%+ bounce rate contacts)',
-          'Segment list: engaged (opened in last 30d) vs cold — send reminders ONLY to engaged',
-          'Warm up sending domain if new (send small volume first, ramp over 7-10 days)',
-          'Use verified Kit domain, NOT shared sender',
-        ],
-      },
-      {
-        name: 'Phase 4 — Measure & Iterate',
-        actions: [
-          'Track show rate segmented by traffic source (paid vs organic vs email)',
-          'Track show rate by reminder channel (which drove the attendee?)',
-          'If paid cold still under 35%, check lead quality upstream (CPM/LCTR likely choked)',
-          'Target: move to 40%+ within 2 weeks of full reminder stack deployed',
-        ],
-      },
+      { name: 'Phase 1 — Reminder Stack (24-48hr)', actions: ['Build full multi-channel reminder sequence: Email + SMS + ManyChat (Hydra Strategy)', 'Cadence: 24hr before, 3hr before, 1hr before, 10min before', 'SMS must include area code matching recipient for 2x pickup rate', 'ManyChat flow with comment-trigger on latest post: "DM me SHOW to get the link"', 'Confirmation page: embedded host video + event details + "add to calendar" button'] },
+      { name: 'Phase 2 — Pre-Frame Content (48-72hr)', actions: ['Deploy Hammer Them campaign: 15-20 content pieces in 72hr window before webinar', 'Include in content: mechanism explanation, proof elements, one objection crush per piece', 'Write value-dense emails (not reminder stubs) — full story/framing inside the email body', 'Each email answers ONE objection or reinforces ONE belief', 'Include "live only" bonus mention to anchor the urgency to show live'] },
+      { name: 'Phase 3 — Deliverability Audit (Day 1)', actions: ['Verify SPF, DKIM, DMARC records on sending domain', 'Scrub list with NeverBounce (remove 2%+ bounce rate contacts)', 'Segment list: engaged (opened in last 30d) vs cold — send reminders ONLY to engaged', 'Warm up sending domain if new (send small volume first, ramp over 7-10 days)', 'Use verified Kit domain, NOT shared sender'] },
+      { name: 'Phase 4 — Measure & Iterate', actions: ['Track show rate segmented by traffic source (paid vs organic vs email)', 'Track show rate by reminder channel (which drove the attendee?)', 'If paid cold still under 35%, check lead quality upstream (CPM/LCTR likely choked)', 'Target: move to 40%+ within 2 weeks of full reminder stack deployed'] },
     ],
     tools: ['Kit (email)', 'GHL (SMS)', 'ManyChat (IG DM automation)', 'WebinarJam', 'NeverBounce'],
     expectedLift: '+10-15% show rate within 14 days of full Hammer Them + Hydra deployment',
@@ -245,46 +372,10 @@ const SOLVE_PLANS = {
       { cause: 'No live urgency mechanism', signal: 'Viewers think they can "book later" and never do' },
     ],
     phases: [
-      {
-        name: 'Phase 1 — Rewrite the Pitch Transition (Day 1)',
-        actions: [
-          'Implement Russell Brunson "permission to close" frame: ask for explicit permission before pitching',
-          'Example: "Would it be okay if I share an opportunity I think could help you? Drop a 1 in the chat if yes."',
-          'Wait for chat engagement before continuing — creates micro-commitment',
-          'After permission granted, pitch hard and clear, no soft-selling',
-          'Reference T5 SOP: "how you pitch, how long you pitch, how hard you pitch" all matter',
-        ],
-      },
-      {
-        name: 'Phase 2 — Offer Construction (Day 2-3)',
-        actions: [
-          'Stack the offer: core deliverable + 3-5 tangible bonuses + risk reversal',
-          'Add live-only scarcity: "First 10 bookings get [bonus] — only available on this call"',
-          'Anchor pricing against higher comparable (competitor cost or DFY cost)',
-          'Make the CTA obvious: single action = book the call, no other choices',
-          'Reference Hormozi Goated Ads pricing anchor principles from playbook',
-        ],
-      },
-      {
-        name: 'Phase 3 — Reduce Call Booking Friction (Day 3-4)',
-        actions: [
-          'Cut application to 3-5 essential qualifying questions max',
-          'Add call slots before 9am and after 5pm in host\'s timezone',
-          'Add weekend availability (Saturday 10am-2pm minimum)',
-          'Direct-to-calendar after pitch — no app page, no middle step',
-          'Test: direct calendar link vs app-then-calendar (usually direct wins for webinars)',
-        ],
-      },
-      {
-        name: 'Phase 4 — Re-Pitch & Objection Handling',
-        actions: [
-          'After main pitch, do a 5-minute objection handling block covering top 3 objections',
-          'Re-pitch at the end with urgency ("calendar closes tonight" or bonus expiry)',
-          'Add FAQ section to replay / confirmation page for people watching recording',
-          'Deploy post-webinar sequence: 3-email follow-up for non-bookers over 48hr',
-          'Target: 22-30% booking rate within 2 webinars of implementing this',
-        ],
-      },
+      { name: 'Phase 1 — Rewrite the Pitch Transition (Day 1)', actions: ['Implement Russell Brunson "permission to close" frame: ask for explicit permission before pitching', 'Example: "Would it be okay if I share an opportunity I think could help you? Drop a 1 in the chat if yes."', 'Wait for chat engagement before continuing — creates micro-commitment', 'After permission granted, pitch hard and clear, no soft-selling', 'Reference T5 SOP: "how you pitch, how long you pitch, how hard you pitch" all matter'] },
+      { name: 'Phase 2 — Offer Construction (Day 2-3)', actions: ['Stack the offer: core deliverable + 3-5 tangible bonuses + risk reversal', 'Add live-only scarcity: "First 10 bookings get [bonus] — only available on this call"', 'Anchor pricing against higher comparable (competitor cost or DFY cost)', 'Make the CTA obvious: single action = book the call, no other choices', 'Reference Hormozi Goated Ads pricing anchor principles from playbook'] },
+      { name: 'Phase 3 — Reduce Call Booking Friction (Day 3-4)', actions: ['Cut application to 3-5 essential qualifying questions max', 'Add call slots before 9am and after 5pm in host\'s timezone', 'Add weekend availability (Saturday 10am-2pm minimum)', 'Direct-to-calendar after pitch — no app page, no middle step', 'Test: direct calendar link vs app-then-calendar (usually direct wins for webinars)'] },
+      { name: 'Phase 4 — Re-Pitch & Objection Handling', actions: ['After main pitch, do a 5-minute objection handling block covering top 3 objections', 'Re-pitch at the end with urgency ("calendar closes tonight" or bonus expiry)', 'Add FAQ section to replay / confirmation page for people watching recording', 'Deploy post-webinar sequence: 3-email follow-up for non-bookers over 48hr', 'Target: 22-30% booking rate within 2 webinars of implementing this'] },
     ],
     tools: ['WebinarJam (live chat for permission frame)', 'Calendly (expanded slots)', 'Typeform/GHL (shortened app)', 'Kit (post-webinar sequence)'],
     expectedLift: 'From 11% → 22-30% booking rate within 2-3 webinars (Jeremy Haynes benchmark)',
@@ -299,46 +390,10 @@ const SOLVE_PLANS = {
       { cause: 'Setters sending unqualified leads', signal: 'High show rate but bad fit on calls' },
     ],
     phases: [
-      {
-        name: 'Phase 1 — Call Recording Audit (Day 1-3)',
-        actions: [
-          'Pull last 20 Fathom recordings of lost deals',
-          'Categorize top 3 objections by frequency (usually: price, timing, partner/spouse)',
-          'Identify where closers break script or lose control of the call',
-          'Note the average call length of closed vs lost deals',
-          'Flag calls where closer didn\'t ask a hard close question',
-        ],
-      },
-      {
-        name: 'Phase 2 — Rewrite Objection Rebuttals (Day 3-5)',
-        actions: [
-          'Use Hormozi closes: "Both Options Are Risk Free", "Decadere", "1 to 10 Close"',
-          'Price objection: "Best Case Worst Case" frame with risk reversal',
-          'Timing objection: "You saw an ad, clicked, opted in, showed up... you\'re 6 inches from gold"',
-          'Partner objection: "What would they need to hear to feel good about this?"',
-          'Script each rebuttal into a 30-second block — closer memorizes verbatim',
-        ],
-      },
-      {
-        name: 'Phase 3 — Closer Performance & Replacement',
-        actions: [
-          'Rank closers by close rate over last 60 days',
-          'Top 30% — give them more calls, pay higher commission',
-          'Middle 40% — coach weekly with call reviews, set 30-day improvement target',
-          'Bottom 30% — replace or move to setter role',
-          'Record top closer\'s best call, use as training asset for new hires',
-        ],
-      },
-      {
-        name: 'Phase 4 — Payment Plan & Close Mechanics',
-        actions: [
-          'Add deposit-first option ($500-$1000 today, balance in 7 days)',
-          'Test "Decadere" close on fence-sitters — reframes decision as cutting off future',
-          'Test "1 to 10" close — where are you, what would get you to a 10?',
-          'Deploy post-call follow-up: 3-touch sequence over 72hr (SMS + call + email)',
-          'Target: 20-28% close rate sustained across full sales team',
-        ],
-      },
+      { name: 'Phase 1 — Call Recording Audit (Day 1-3)', actions: ['Pull last 20 Fathom recordings of lost deals', 'Categorize top 3 objections by frequency (usually: price, timing, partner/spouse)', 'Identify where closers break script or lose control of the call', 'Note the average call length of closed vs lost deals', 'Flag calls where closer didn\'t ask a hard close question'] },
+      { name: 'Phase 2 — Rewrite Objection Rebuttals (Day 3-5)', actions: ['Use Hormozi closes: "Both Options Are Risk Free", "Decadere", "1 to 10 Close"', 'Price objection: "Best Case Worst Case" frame with risk reversal', 'Timing objection: "You saw an ad, clicked, opted in, showed up... you\'re 6 inches from gold"', 'Partner objection: "What would they need to hear to feel good about this?"', 'Script each rebuttal into a 30-second block — closer memorizes verbatim'] },
+      { name: 'Phase 3 — Closer Performance & Replacement', actions: ['Rank closers by close rate over last 60 days', 'Top 30% — give them more calls, pay higher commission', 'Middle 40% — coach weekly with call reviews, set 30-day improvement target', 'Bottom 30% — replace or move to setter role', 'Record top closer\'s best call, use as training asset for new hires'] },
+      { name: 'Phase 4 — Payment Plan & Close Mechanics', actions: ['Add deposit-first option ($500-$1000 today, balance in 7 days)', 'Test "Decadere" close on fence-sitters — reframes decision as cutting off future', 'Test "1 to 10" close — where are you, what would get you to a 10?', 'Deploy post-call follow-up: 3-touch sequence over 72hr (SMS + call + email)', 'Target: 20-28% close rate sustained across full sales team'] },
     ],
     tools: ['Fathom (call recordings)', 'Close CRM (closer analytics)', 'Stripe (deposit processing)', 'Hormozi Closing Playbook'],
     expectedLift: '+5-10% close rate within 30 days of closer audit + objection rebuild',
@@ -353,44 +408,10 @@ const SOLVE_PLANS = {
       { cause: 'Competitive placement bidding', signal: 'High-competition niche during peak auction hours' },
     ],
     phases: [
-      {
-        name: 'Phase 1 — Audience Refresh (Day 1-2)',
-        actions: [
-          'Pause audiences with frequency above 4.0',
-          'Build new 1% lookalike from last 90 days of purchasers (not all leads)',
-          'Layer interest stack: 3-5 new interests not tested in last 60 days',
-          'Test broad targeting (no interests) with strong creative hooks',
-          'Deploy Forester Strategy: warm-up engagement campaign before direct response',
-        ],
-      },
-      {
-        name: 'Phase 2 — Creative Rotation (Day 2-4)',
-        actions: [
-          'Launch 3-5 new creative angles using Hook-Meat-CTA framework',
-          'Rotate formats: static, video, UGC, carousel',
-          'Kill any ad with CTR below 0.8% after 500 impressions',
-          'A/B test Reels + Stories placement against Feed-only',
-          'Use Venus Fly Trap: engagement-first creative before direct response',
-        ],
-      },
-      {
-        name: 'Phase 3 — Placement & Day-parting',
-        actions: [
-          'Check placement breakdown — pause expensive placements if they\'re not converting',
-          'Test day-parting: pause between 11pm-5am if CPM spikes at night',
-          'Move spend to Advantage+ placements if currently manual',
-          'Test Instagram Reels + TikTok if currently Facebook-only',
-        ],
-      },
-      {
-        name: 'Phase 4 — Downstream Quality Check',
-        actions: [
-          'CRITICAL: monitor downstream stats after CPM drops',
-          'If opt-in rate drops 5%+, you optimized for cheap clicks not quality traffic',
-          'Track cost per QUALIFIED call, not just cost per CPM',
-          'Target: CPM reduction of 20-30% while maintaining opt-in rate',
-        ],
-      },
+      { name: 'Phase 1 — Audience Refresh (Day 1-2)', actions: ['Pause audiences with frequency above 4.0', 'Build new 1% lookalike from last 90 days of purchasers (not all leads)', 'Layer interest stack: 3-5 new interests not tested in last 60 days', 'Test broad targeting (no interests) with strong creative hooks', 'Deploy Forester Strategy: warm-up engagement campaign before direct response'] },
+      { name: 'Phase 2 — Creative Rotation (Day 2-4)', actions: ['Launch 3-5 new creative angles using Hook-Meat-CTA framework', 'Rotate formats: static, video, UGC, carousel', 'Kill any ad with CTR below 0.8% after 500 impressions', 'A/B test Reels + Stories placement against Feed-only', 'Use Venus Fly Trap: engagement-first creative before direct response'] },
+      { name: 'Phase 3 — Placement & Day-parting', actions: ['Check placement breakdown — pause expensive placements if they\'re not converting', 'Test day-parting: pause between 11pm-5am if CPM spikes at night', 'Move spend to Advantage+ placements if currently manual', 'Test Instagram Reels + TikTok if currently Facebook-only'] },
+      { name: 'Phase 4 — Downstream Quality Check', actions: ['CRITICAL: monitor downstream stats after CPM drops', 'If opt-in rate drops 5%+, you optimized for cheap clicks not quality traffic', 'Track cost per QUALIFIED call, not just cost per CPM', 'Target: CPM reduction of 20-30% while maintaining opt-in rate'] },
     ],
     tools: ['Facebook Ads Manager', 'TikTok Ads', 'Venus Fly Trap SOP', 'Forester SOP', 'Ad Fatigue Protocol'],
     expectedLift: 'CPM reduction 20-40% within 14 days, without downstream quality loss',
@@ -405,43 +426,10 @@ const SOLVE_PLANS = {
       { cause: 'Creative format wrong for audience', signal: 'Static ads for video-native audience' },
     ],
     phases: [
-      {
-        name: 'Phase 1 — Rewrite Top 5 Hooks (Day 1-2)',
-        actions: [
-          'Pull T5 Swipe File (SOP 20) for proven hook formats',
-          'Rewrite using proof-first angles: "$30M+ generated for clients" vs generic claims',
-          'Test pattern interrupts: unexpected statement, visual jump, question opening',
-          'Include specificity in first 3 seconds: numbers, names, timeframes',
-          'Banned: vague phrases like "scale your business" or "next level"',
-        ],
-      },
-      {
-        name: 'Phase 2 — Cut First 3 Seconds Aggressively',
-        actions: [
-          'Review all running ads — cut the first 3 seconds if it\'s slow',
-          'Start with mid-action, mid-sentence for pattern interrupt',
-          'Test "speaker reveal" delay vs immediate talking head',
-          'Add captions/subtitles from frame 1 (most viewers muted)',
-        ],
-      },
-      {
-        name: 'Phase 3 — Test Creative Formats',
-        actions: [
-          'Launch 3 format variants: talking head, UGC-style, static with bold text',
-          'Test 15-second short-form against 60-second deeper context ads',
-          'Add motion graphics / text overlays to static ads',
-          'Deploy Hormozi Goated Ads framework: Hook → Meat → CTA in that exact order',
-        ],
-      },
-      {
-        name: 'Phase 4 — Monitor Downstream',
-        actions: [
-          'CRITICAL: if CTR jumps 50%+ but opt-in drops, you wrote clickbait not a hook',
-          'Track cost per QUALIFIED opt-in, not just cost per click',
-          'Kill any hook that boosts CTR but tanks show rate',
-          'Target: CTR 2-3% with opt-in rate maintained or higher',
-        ],
-      },
+      { name: 'Phase 1 — Rewrite Top 5 Hooks (Day 1-2)', actions: ['Pull T5 Swipe File (SOP 20) for proven hook formats', 'Rewrite using proof-first angles: "$30M+ generated for clients" vs generic claims', 'Test pattern interrupts: unexpected statement, visual jump, question opening', 'Include specificity in first 3 seconds: numbers, names, timeframes', 'Banned: vague phrases like "scale your business" or "next level"'] },
+      { name: 'Phase 2 — Cut First 3 Seconds Aggressively', actions: ['Review all running ads — cut the first 3 seconds if it\'s slow', 'Start with mid-action, mid-sentence for pattern interrupt', 'Test "speaker reveal" delay vs immediate talking head', 'Add captions/subtitles from frame 1 (most viewers muted)'] },
+      { name: 'Phase 3 — Test Creative Formats', actions: ['Launch 3 format variants: talking head, UGC-style, static with bold text', 'Test 15-second short-form against 60-second deeper context ads', 'Add motion graphics / text overlays to static ads', 'Deploy Hormozi Goated Ads framework: Hook → Meat → CTA in that exact order'] },
+      { name: 'Phase 4 — Monitor Downstream', actions: ['CRITICAL: if CTR jumps 50%+ but opt-in drops, you wrote clickbait not a hook', 'Track cost per QUALIFIED opt-in, not just cost per click', 'Kill any hook that boosts CTR but tanks show rate', 'Target: CTR 2-3% with opt-in rate maintained or higher'] },
     ],
     tools: ['T5 Swipe File (SOP 20)', 'Hormozi 100M Hooks Playbook', 'Facebook Ads Manager', 'Submagic (captions)'],
     expectedLift: 'CTR 1.5-3% within 10 days of hook rewrite + creative refresh',
@@ -456,44 +444,10 @@ const SOLVE_PLANS = {
       { cause: 'Page load speed slow', signal: '3+ seconds on mobile' },
     ],
     phases: [
-      {
-        name: 'Phase 1 — Headline A/B Test (Day 1)',
-        actions: [
-          'Write 5 new headlines using proof-first structure',
-          'Format: "[Proof] + [Mechanism] + [Outcome]" — ex: "How Cue Banks Scaled to $5M+ Using This Webinar System"',
-          'Match headline to ad creative promise (continuity of message)',
-          'Deploy split test with 50/50 traffic split, decide winner after 500 visitors per variant',
-        ],
-      },
-      {
-        name: 'Phase 2 — VSL / Above-Fold Optimization (Day 2-3)',
-        actions: [
-          'Review VSL play rate — if under 60%, thumbnail is weak',
-          'Test custom thumbnail with host face + bold text overlay',
-          'Move VSL higher on page — above the fold, minimal text above it',
-          'Test auto-play muted vs manual play (audiences differ)',
-          'If VSL over 10 min, add chapter markers for skip-ability',
-        ],
-      },
-      {
-        name: 'Phase 3 — Form Friction Reduction (Day 3)',
-        actions: [
-          'Cut form to 2 fields: email + phone (drop first name, last name, company, etc.)',
-          'Use inline validation — no "submit then error" loops',
-          'Make CTA button specific: "Save My Seat →" not "Submit"',
-          'Add trust elements near form: testimonial, logo bar, privacy note',
-          'Mobile-first check — 80%+ traffic is mobile, form must be thumb-friendly',
-        ],
-      },
-      {
-        name: 'Phase 4 — Behavior Analysis',
-        actions: [
-          'Install Hotjar / Microsoft Clarity session recording',
-          'Review 20 recordings — identify rage clicks, scroll-bounce, form abandons',
-          'Fix anything that creates visible confusion',
-          'Target: 35-45% opt-in rate within 7 days',
-        ],
-      },
+      { name: 'Phase 1 — Headline A/B Test (Day 1)', actions: ['Write 5 new headlines using proof-first structure', 'Format: "[Proof] + [Mechanism] + [Outcome]" — ex: "How Cue Banks Scaled to $5M+ Using This Webinar System"', 'Match headline to ad creative promise (continuity of message)', 'Deploy split test with 50/50 traffic split, decide winner after 500 visitors per variant'] },
+      { name: 'Phase 2 — VSL / Above-Fold Optimization (Day 2-3)', actions: ['Review VSL play rate — if under 60%, thumbnail is weak', 'Test custom thumbnail with host face + bold text overlay', 'Move VSL higher on page — above the fold, minimal text above it', 'Test auto-play muted vs manual play (audiences differ)', 'If VSL over 10 min, add chapter markers for skip-ability'] },
+      { name: 'Phase 3 — Form Friction Reduction (Day 3)', actions: ['Cut form to 2 fields: email + phone (drop first name, last name, company, etc.)', 'Use inline validation — no "submit then error" loops', 'Make CTA button specific: "Save My Seat →" not "Submit"', 'Add trust elements near form: testimonial, logo bar, privacy note', 'Mobile-first check — 80%+ traffic is mobile, form must be thumb-friendly'] },
+      { name: 'Phase 4 — Behavior Analysis', actions: ['Install Hotjar / Microsoft Clarity session recording', 'Review 20 recordings — identify rage clicks, scroll-bounce, form abandons', 'Fix anything that creates visible confusion', 'Target: 35-45% opt-in rate within 7 days'] },
     ],
     tools: ['GHL / ClickFunnels', 'Wistia (VSL analytics)', 'Hotjar (session recording)', 'T5 Swipe File'],
     expectedLift: '+10-15% opt-in rate within 7 days of headline + form optimization',
@@ -508,42 +462,10 @@ const SOLVE_PLANS = {
       { cause: 'Pitch anxiety — host delays it', signal: 'Padding content to avoid selling' },
     ],
     phases: [
-      {
-        name: 'Phase 1 — Cut Runtime (Day 1)',
-        actions: [
-          'Target pitch at 40-50 minute mark, not 60+',
-          'Cut 10-15 min of pre-pitch content that doesn\'t move viewers toward pitch',
-          'Remove redundant proof points — pick strongest 3, not all 10',
-          'Tighten mechanism explanation to 5-7 min max',
-        ],
-      },
-      {
-        name: 'Phase 2 — Add Engagement Hooks',
-        actions: [
-          'Drop polls every 8-10 minutes ("drop a 1 in chat if this resonates")',
-          'Ask direct questions that require chat responses',
-          'Use "pattern interrupts" every 10 min — visual change, story, hot take',
-          'Keep chat moderator actively highlighting engaged viewers',
-        ],
-      },
-      {
-        name: 'Phase 3 — Presenter Energy Audit',
-        actions: [
-          'Review own replay — flag any 5-min stretch where energy drops',
-          'Stand during delivery if not already',
-          'Move / gesture — static presenters lose attention faster',
-          'Vary tone: whisper-normal-loud pattern, not monotone',
-        ],
-      },
-      {
-        name: 'Phase 4 — Pitch Transition',
-        actions: [
-          'Test moving pitch earlier (40 min vs 60 min)',
-          'Deploy "permission to close" frame right before pitch',
-          'Measure attendance at each 10-min mark to find drop cliff',
-          'Target: 75%+ pitch attendance within 2 webinars',
-        ],
-      },
+      { name: 'Phase 1 — Cut Runtime (Day 1)', actions: ['Target pitch at 40-50 minute mark, not 60+', 'Cut 10-15 min of pre-pitch content that doesn\'t move viewers toward pitch', 'Remove redundant proof points — pick strongest 3, not all 10', 'Tighten mechanism explanation to 5-7 min max'] },
+      { name: 'Phase 2 — Add Engagement Hooks', actions: ['Drop polls every 8-10 minutes ("drop a 1 in chat if this resonates")', 'Ask direct questions that require chat responses', 'Use "pattern interrupts" every 10 min — visual change, story, hot take', 'Keep chat moderator actively highlighting engaged viewers'] },
+      { name: 'Phase 3 — Presenter Energy Audit', actions: ['Review own replay — flag any 5-min stretch where energy drops', 'Stand during delivery if not already', 'Move / gesture — static presenters lose attention faster', 'Vary tone: whisper-normal-loud pattern, not monotone'] },
+      { name: 'Phase 4 — Pitch Transition', actions: ['Test moving pitch earlier (40 min vs 60 min)', 'Deploy "permission to close" frame right before pitch', 'Measure attendance at each 10-min mark to find drop cliff', 'Target: 75%+ pitch attendance within 2 webinars'] },
     ],
     tools: ['WebinarJam (attendance timeline)', 'Fathom (replay review)', 'SOP 4 template'],
     expectedLift: '+10-15% pitch attendance within 2 webinars of restructure',
@@ -558,42 +480,10 @@ const SOLVE_PLANS = {
       { cause: 'Call slot timing bad', signal: 'Calls booked during work hours with no flexibility' },
     ],
     phases: [
-      {
-        name: 'Phase 1 — Selfie Video Follow-Up (Day 1)',
-        actions: [
-          'Setter records personalized selfie video within 1hr of booking',
-          'Script: name, acknowledgment of booking, what to expect, 1 question to prep',
-          'Keep under 60 seconds, send via preferred platform (SMS/WhatsApp/iMessage)',
-          'This alone can add 10-15% show rate per Jeremy Haynes',
-        ],
-      },
-      {
-        name: 'Phase 2 — Day-Of Reminder Stack',
-        actions: [
-          'Morning-of text: "Excited for our call at [time]! Here\'s the Zoom link: [link]"',
-          '1-hour-before text: "Jumping on in 1 hour — any last questions?"',
-          '10-minute-before: "Hopping in now, see you shortly"',
-          'Send from iPhone/iMessage if possible — higher read rates than carrier SMS',
-        ],
-      },
-      {
-        name: 'Phase 3 — Setter Audit',
-        actions: [
-          'Screen-share each setter\'s message history to identify quality variance',
-          'Check: profile photo quality, tonality, personalization, typos',
-          'Compare show rates by setter — 20%+ variance means one is failing',
-          'Retrain or replace setters with show rates below team average',
-        ],
-      },
-      {
-        name: 'Phase 4 — Call Slot Expansion',
-        actions: [
-          'Add slots 7am-9am and 5pm-8pm local time',
-          'Add Saturday morning slots (10am-2pm)',
-          'Offer rescheduling 1x automatically without friction',
-          'Target: 65-75% call show rate within 14 days',
-        ],
-      },
+      { name: 'Phase 1 — Selfie Video Follow-Up (Day 1)', actions: ['Setter records personalized selfie video within 1hr of booking', 'Script: name, acknowledgment of booking, what to expect, 1 question to prep', 'Keep under 60 seconds, send via preferred platform (SMS/WhatsApp/iMessage)', 'This alone can add 10-15% show rate per Jeremy Haynes'] },
+      { name: 'Phase 2 — Day-Of Reminder Stack', actions: ['Morning-of text: "Excited for our call at [time]! Here\'s the Zoom link: [link]"', '1-hour-before text: "Jumping on in 1 hour — any last questions?"', '10-minute-before: "Hopping in now, see you shortly"', 'Send from iPhone/iMessage if possible — higher read rates than carrier SMS'] },
+      { name: 'Phase 3 — Setter Audit', actions: ['Screen-share each setter\'s message history to identify quality variance', 'Check: profile photo quality, tonality, personalization, typos', 'Compare show rates by setter — 20%+ variance means one is failing', 'Retrain or replace setters with show rates below team average'] },
+      { name: 'Phase 4 — Call Slot Expansion', actions: ['Add slots 7am-9am and 5pm-8pm local time', 'Add Saturday morning slots (10am-2pm)', 'Offer rescheduling 1x automatically without friction', 'Target: 65-75% call show rate within 14 days'] },
     ],
     tools: ['Close CRM (setter analytics)', 'Loom / Fathom (selfie videos)', 'GHL SMS', 'Calendly'],
     expectedLift: '+10-15% call show rate within 14 days of selfie video + reminder stack',
@@ -608,41 +498,10 @@ const SOLVE_PLANS = {
       { cause: 'No down-sell path', signal: 'Lost deals walk away with $0 instead of lower tier' },
     ],
     phases: [
-      {
-        name: 'Phase 1 — Add PIF Discount (Day 1)',
-        actions: [
-          'Offer 10-20% discount for pay-in-full at close',
-          'Frame as "save $X today" not "pay more later"',
-          'Train closers to lead with PIF option, payment plan is fallback',
-          'Anchor full price first, then reveal PIF discount as exclusive',
-        ],
-      },
-      {
-        name: 'Phase 2 — Shorten Payment Plans',
-        actions: [
-          'Move 12-month plans to 6-month max',
-          'Move 6-month plans to 3-month max when possible',
-          'Require 30-50% down payment on all plans',
-          'Cut ultra-long plans entirely if collection risk is high',
-        ],
-      },
-      {
-        name: 'Phase 3 — Order Bump / Upsell',
-        actions: [
-          'Add $500-$2000 order bump at checkout (done-for-you asset, bonus coaching call, template pack)',
-          'Deploy 1-click upsell after close: "Want to add [X] for [Y]?"',
-          'Test bump acceptance rate — target 25-40% take rate',
-        ],
-      },
-      {
-        name: 'Phase 4 — Down-Sell for Lost Deals',
-        actions: [
-          'Build a lower-tier offer for deals that say "can\'t afford it"',
-          'Price at 30-50% of flagship, with clear ascension path back up',
-          'Train closers on specific "can I offer you something smaller?" pivot',
-          'Target: 80-90% cash collected vs contract value',
-        ],
-      },
+      { name: 'Phase 1 — Add PIF Discount (Day 1)', actions: ['Offer 10-20% discount for pay-in-full at close', 'Frame as "save $X today" not "pay more later"', 'Train closers to lead with PIF option, payment plan is fallback', 'Anchor full price first, then reveal PIF discount as exclusive'] },
+      { name: 'Phase 2 — Shorten Payment Plans', actions: ['Move 12-month plans to 6-month max', 'Move 6-month plans to 3-month max when possible', 'Require 30-50% down payment on all plans', 'Cut ultra-long plans entirely if collection risk is high'] },
+      { name: 'Phase 3 — Order Bump / Upsell', actions: ['Add $500-$2000 order bump at checkout (done-for-you asset, bonus coaching call, template pack)', 'Deploy 1-click upsell after close: "Want to add [X] for [Y]?"', 'Test bump acceptance rate — target 25-40% take rate'] },
+      { name: 'Phase 4 — Down-Sell for Lost Deals', actions: ['Build a lower-tier offer for deals that say "can\'t afford it"', 'Price at 30-50% of flagship, with clear ascension path back up', 'Train closers on specific "can I offer you something smaller?" pivot', 'Target: 80-90% cash collected vs contract value'] },
     ],
     tools: ['Stripe (deposit processing)', 'Whop (payment plans)', 'Close CRM (deal tracking)', 'Hormozi Pricing Playbook'],
     expectedLift: '+15-25% cash collected within 30 days of offer restructure',
@@ -656,22 +515,8 @@ const SOLVE_PLANS = {
       { cause: 'CAC too high relative to AOV', signal: 'Spending $500 to close a $2K offer' },
     ],
     phases: [
-      {
-        name: 'Phase 1 — Identify Upstream Bottleneck',
-        actions: [
-          'Run full bottleneck analysis — ROAS is never the bottleneck itself',
-          'Rank all stats by gap-to-Good — attack #1 first',
-          'Usually: booking rate, close rate, or opt-in rate is the real issue',
-        ],
-      },
-      {
-        name: 'Phase 2 — Fix That, Not ROAS',
-        actions: [
-          'Don\'t optimize ROAS directly — optimize the root stat',
-          'Cheap CPM "fixes" usually tank downstream quality and kill ROAS anyway',
-          'Fix upstream, ROAS fixes itself within 2-4 weeks',
-        ],
-      },
+      { name: 'Phase 1 — Identify Upstream Bottleneck', actions: ['Run full bottleneck analysis — ROAS is never the bottleneck itself', 'Rank all stats by gap-to-Good — attack #1 first', 'Usually: booking rate, close rate, or opt-in rate is the real issue'] },
+      { name: 'Phase 2 — Fix That, Not ROAS', actions: ['Don\'t optimize ROAS directly — optimize the root stat', 'Cheap CPM "fixes" usually tank downstream quality and kill ROAS anyway', 'Fix upstream, ROAS fixes itself within 2-4 weeks'] },
     ],
     tools: ['Jeremy Haynes Bottleneck Analyzer', 'Full funnel analytics'],
     expectedLift: 'ROAS is a lagging indicator. Fix upstream stats and ROAS follows within 14-30 days.',
@@ -737,6 +582,9 @@ const SOLVE_PLANS = {
   regRate: { diagnosis: 'List-to-registration under 3% means your promo sequence isn\'t converting subscribers.', sopRef: 'SOP 13 (Email Matrix) + Webinar promo sequence', rootCauses: [{ cause: 'Single-email promo', signal: 'Only 1 email sent about webinar' }, { cause: 'No urgency/scarcity', signal: 'No deadline mentioned' }], phases: [{ name: 'Phase 1 — 4-Email Sequence', actions: ['Email 1: Teaser', 'Email 2: Social proof/case study', 'Email 3: Urgency (spots filling)', 'Email 4: Final call (closing tonight)'] }, { name: 'Phase 2 — Add Scarcity', actions: ['"Only X spots left" in final 24hr', 'Real deadline, not fake urgency', 'Close registration after webinar starts'] }], tools: ['Kit sequences', 'WebinarJam', 'GHL'], expectedLift: '+3-5% reg rate within 1 promo cycle' },
 };
 
+const TIER_GAPS = { critical: 4, poor: 3, average: 2, good: 1, elite: 0 };
+const TIER_COLORS = { critical: '#ff3131', poor: '#ff7a00', average: '#ffd60a', good: '#7cff6b', elite: '#00ffc2' };
+
 function getTier(value, benchmark) {
   if (value === null || value === undefined || isNaN(value) || value === '') return null;
   const v = parseFloat(value);
@@ -755,475 +603,451 @@ function getTier(value, benchmark) {
   }
 }
 
-const TIER_GAPS = { critical: 4, poor: 3, average: 2, good: 1, elite: 0 };
-const TIER_COLORS = { critical: '#ff3131', poor: '#ff7a00', average: '#ffd60a', good: '#7cff6b', elite: '#00ffc2' };
-
-export default function BottleneckAnalyzer() {
-  const [funnelType, setFunnelType] = useState('webinar');
-  const [inputs, setInputs] = useState({});
-  const [expandedStat, setExpandedStat] = useState(null);
-  const [calcValues, setCalcValues] = useState({});
-  const [solvingBottleneck, setSolvingBottleneck] = useState(null);
-
-  const benchmarks = BENCHMARKS[funnelType];
-  const statKeys = Object.keys(benchmarks);
-
-  const handleInput = (key, value) => setInputs({ ...inputs, [key]: value });
-  const handleCalcInput = (statKey, fieldKey, value) => setCalcValues({ ...calcValues, [statKey]: { ...(calcValues[statKey] || {}), [fieldKey]: parseFloat(value) || 0 } });
-  const applyCalculated = (statKey) => {
-    const calc = CALCULATORS[statKey];
-    if (!calc) return;
-    const result = calc.calc(calcValues[statKey] || {});
-    if (result > 0) { handleInput(statKey, result.toFixed(2)); setExpandedStat(null); }
-  };
-
-  const analysis = useMemo(() => {
-    const results = statKeys.map((key) => {
-      const val = inputs[key];
-      const bench = benchmarks[key];
-      const tier = getTier(val, bench);
-      const meta = STAT_META[key] || { ease: 3, risk: 3, impact: 3 };
-      const gap = tier ? TIER_GAPS[tier] : 0;
-      const priorityScore = gap > 0 ? (gap * meta.impact * meta.ease) / meta.risk : 0;
-      return { key, label: bench.label, value: val, tier, bench, meta, gap, priorityScore };
-    });
-    return results.sort((a, b) => b.priorityScore - a.priorityScore);
-  }, [inputs, funnelType, benchmarks, statKeys]);
-
-  const topBottlenecks = analysis.filter((r) => r.priorityScore > 0).slice(0, 3);
-  const filledCount = statKeys.filter((k) => inputs[k] !== undefined && inputs[k] !== '').length;
-  const hasData = filledCount > 0;
-  const reset = () => { setInputs({}); setCalcValues({}); setExpandedStat(null); };
-  const formatNumber = (val, format) => {
-    if (!val) return '';
-    const n = parseFloat(val);
-    if (format === '' && n >= 1000) return n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : `${(n / 1000).toFixed(1)}K`;
-    return val;
-  };
-
-  const activeSolvePlan = solvingBottleneck ? { stat: topBottlenecks.find(b => b.key === solvingBottleneck), plan: SOLVE_PLANS[solvingBottleneck] } : null;
-
-  return (
-    <div style={S.root}>
-      <style>{css}</style>
-
-      {/* MODAL: SOLVE BOTTLENECK */}
-      {activeSolvePlan && activeSolvePlan.stat && activeSolvePlan.plan && (
-        <div style={S.modalOverlay} onClick={() => setSolvingBottleneck(null)}>
-          <div style={S.modalContainer} onClick={(e) => e.stopPropagation()}>
-            <div style={S.modalHeader}>
-              <div>
-                <div style={S.modalLabel}>SOLVING BOTTLENECK</div>
-                <div style={S.modalTitle}>{activeSolvePlan.stat.label}</div>
-                <div style={S.modalMeta}>
-                  <span style={{ color: TIER_COLORS[activeSolvePlan.stat.tier] }}>
-                    {activeSolvePlan.stat.value}{activeSolvePlan.stat.bench.format === '%' ? '%' : activeSolvePlan.stat.bench.format === 'x' ? 'x' : ''} · {activeSolvePlan.stat.tier.toUpperCase()}
-                  </span>
-                  <span style={S.modalDivider}>→</span>
-                  <span style={{ color: TIER_COLORS.good }}>
-                    TARGET: {activeSolvePlan.stat.bench.inverse ? `<${activeSolvePlan.stat.bench.good}` : `${activeSolvePlan.stat.bench.good}+`}{activeSolvePlan.stat.bench.format === '%' ? '%' : activeSolvePlan.stat.bench.format === 'x' ? 'x' : ''}
-                  </span>
-                </div>
-              </div>
-              <button onClick={() => setSolvingBottleneck(null)} style={S.modalClose}>✕</button>
-            </div>
-
-            <div style={S.modalBody}>
-              <div style={S.diagnosisBlock}>
-                <div style={S.blockLabel}>DIAGNOSIS</div>
-                <div style={S.diagnosisText}>{activeSolvePlan.plan.diagnosis}</div>
-                <div style={S.sopRef}>REFERENCE: {activeSolvePlan.plan.sopRef}</div>
-              </div>
-
-              <div style={S.rootCausesBlock}>
-                <div style={S.blockLabel}>ROOT CAUSES · MATCH THE SIGNAL TO YOUR REALITY</div>
-                {activeSolvePlan.plan.rootCauses && activeSolvePlan.plan.rootCauses.map((rc, i) => (
-                  <div key={i} style={S.rootCauseRow}>
-                    <div style={S.rootCauseName}>{rc.cause}</div>
-                    <div style={S.rootCauseSignal}>→ {rc.signal}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div style={S.phasesBlock}>
-                <div style={S.blockLabel}>EXECUTION PLAN</div>
-                {activeSolvePlan.plan.phases.map((phase, i) => (
-                  <div key={i} style={S.phaseCard}>
-                    <div style={S.phaseHeader}>
-                      <div style={S.phaseNumber}>{i + 1}</div>
-                      <div style={S.phaseName}>{phase.name}</div>
-                    </div>
-                    <div style={S.phaseActions}>
-                      {phase.actions.map((action, j) => (
-                        <div key={j} style={S.phaseAction}>
-                          <span style={S.phaseBullet}>→</span>
-                          <span>{action}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div style={S.footerBlock}>
-                <div style={S.footerRow}>
-                  <div style={S.footerCol}>
-                    <div style={S.footerColLabel}>TOOLS NEEDED</div>
-                    <div style={S.toolsList}>
-                      {activeSolvePlan.plan.tools && activeSolvePlan.plan.tools.map((t, i) => (
-                        <span key={i} style={S.toolPill}>{t}</span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div style={S.expectedLift}>
-                  <span style={S.liftLabel}>EXPECTED LIFT:</span> {activeSolvePlan.plan.expectedLift}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div style={S.topBar}>
-        <div style={S.brand}>
-          <span style={S.brandMark}>T5</span>
-          <span style={S.brandDot}>●</span>
-          <span style={S.brandText}>BOTTLENECK.ANALYZER</span>
-        </div>
-        <div style={S.statusBar}>
-          <span style={S.statusDot} />
-          <span>{filledCount}/{statKeys.length} STATS</span>
-        </div>
-      </div>
-
-      <div style={S.funnelBar}>
-        {Object.entries(FUNNEL_CATEGORIES).map(([catKey, cat]) => (
-          <div key={catKey} style={S.funnelGroup}>
-            <span style={S.funnelGroupLabel}>{cat.label}</span>
-            <div style={S.funnelTabs}>
-              {cat.funnels.map((f) => (
-                <button key={f.id} onClick={() => { setFunnelType(f.id); setInputs({}); setCalcValues({}); setExpandedStat(null); }} style={{ ...S.tab, ...(funnelType === f.id ? S.tabActive : {}) }}>
-                  {f.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div style={S.mainGrid}>
-        <div style={S.leftPanel}>
-          <div style={S.panelHeader}>
-            <span style={S.panelLabel}>INPUT STATS</span>
-            {hasData && <button onClick={reset} style={S.resetBtn}>RESET</button>}
-          </div>
-          <div style={S.helpHint}>
-            <span>Click </span>
-            <span style={S.helpIconInline}>?</span>
-            <span> on any stat to see the formula + calculator</span>
-          </div>
-          <div style={S.inputList}>
-            {statKeys.map((key) => {
-              const bench = benchmarks[key];
-              const val = inputs[key];
-              const tier = getTier(val, bench);
-              const formula = FORMULAS[key];
-              const calculator = CALCULATORS[key];
-              const isExpanded = expandedStat === key;
-              const cv = calcValues[key] || {};
-              const calcResult = calculator ? calculator.calc(cv) : 0;
-
-              return (
-                <div key={key} style={S.inputRowWrapper}>
-                  <div style={S.inputRow}>
-                    <div style={S.inputRowLeft}>
-                      <div style={S.inputLabelWrap}>
-                        <span style={S.inputLabel}>{bench.label}</span>
-                        {formula && (
-                          <button onClick={() => setExpandedStat(isExpanded ? null : key)} style={{ ...S.helpIcon, ...(isExpanded ? S.helpIconActive : {}) }} title="Show formula & calculator">?</button>
-                        )}
-                      </div>
-                      <div style={S.inputBench}>GOOD: {bench.inverse ? `<${bench.good}` : `${bench.good}+`}{bench.format}</div>
-                    </div>
-                    <div style={S.inputRight}>
-                      <div style={S.inputWrap}>
-                        {bench.format === '$' && <span style={S.inputPrefix}>$</span>}
-                        <input type="number" step="0.01" value={val || ''} onChange={(e) => handleInput(key, e.target.value)} placeholder="—" style={{ ...S.input, paddingLeft: bench.format === '$' ? '22px' : '14px', borderColor: tier ? TIER_COLORS[tier] : '#2a2a2a' }} />
-                        {(bench.format === '%' || bench.format === 'x') && <span style={S.inputSuffix}>{bench.format}</span>}
-                      </div>
-                      {tier && <div style={{ ...S.tierPill, background: TIER_COLORS[tier], color: '#000' }}>{tier.toUpperCase().slice(0, 4)}</div>}
-                    </div>
-                  </div>
-
-                  {isExpanded && formula && (
-                    <div style={S.helpPanel}>
-                      <div style={S.helpSection}>
-                        <div style={S.helpSectionLabel}>FORMULA</div>
-                        <div style={S.helpFormula}>{formula.formula}</div>
-                      </div>
-                      <div style={S.helpSection}>
-                        <div style={S.helpSectionLabel}>WHERE TO FIND</div>
-                        <div style={S.helpText}>{formula.where}</div>
-                      </div>
-                      {formula.note && (
-                        <div style={S.helpSection}>
-                          <div style={S.helpSectionLabel}>NOTE</div>
-                          <div style={S.helpText}>{formula.note}</div>
-                        </div>
-                      )}
-                      {calculator && (
-                        <div style={S.calcSection}>
-                          <div style={S.helpSectionLabel}>CALCULATE IT</div>
-                          <div style={S.calcFields}>
-                            {calculator.fields.map((f) => (
-                              <div key={f.key} style={S.calcField}>
-                                <label style={S.calcLabel}>{f.label}</label>
-                                <div style={S.calcInputWrap}>
-                                  {f.prefix && <span style={S.calcPrefix}>{f.prefix}</span>}
-                                  <input type="number" step="0.01" value={cv[f.key] || ''} onChange={(e) => handleCalcInput(key, f.key, e.target.value)} placeholder="0" style={{ ...S.calcInput, paddingLeft: f.prefix ? '20px' : '10px' }} />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          {calcResult > 0 && (
-                            <div style={S.calcResult}>
-                              <span style={S.calcResultLabel}>=</span>
-                              <span style={S.calcResultValue}>{bench.format === '$' && '$'}{calcResult.toFixed(2)}{bench.format === '%' && '%'}{bench.format === 'x' && 'x'}</span>
-                              <button onClick={() => applyCalculated(key)} style={S.applyBtn}>USE THIS →</button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div style={S.rightPanel}>
-          {!hasData ? (
-            <div style={S.emptyState}>
-              <div style={S.emptyMark}>→</div>
-              <div style={S.emptyTitle}>PLUG IN YOUR STATS</div>
-              <div style={S.emptyText}>Input your metrics on the left. Click the "?" icon for formulas and a built-in calculator if you need help finding a stat.</div>
-            </div>
-          ) : (
-            <>
-              <div style={S.panelHeader}>
-                <span style={S.panelLabel}>SCORECARD</span>
-                <span style={S.panelSubLabel}>{filledCount} of {statKeys.length} tracked</span>
-              </div>
-              <div style={S.scorecard}>
-                {analysis.filter(r => r.tier).map((r) => (
-                  <div key={r.key} style={S.scoreRow}>
-                    <div style={S.scoreLabel}>{r.label}</div>
-                    <div style={S.scoreBarWrap}>
-                      <div style={{ ...S.scoreBarFill, width: `${Math.min(100, (1 - (r.gap / 4)) * 100)}%`, background: TIER_COLORS[r.tier] }} />
-                    </div>
-                    <div style={S.scoreValue}>
-                      {r.bench.format === '$' && '$'}{formatNumber(r.value, r.bench.format)}{r.bench.format === '%' && '%'}{r.bench.format === 'x' && 'x'}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ ...S.panelHeader, marginTop: '20px' }}>
-                <span style={S.panelLabel}>ATTACK MODE · TOP BOTTLENECKS</span>
-              </div>
-
-              {topBottlenecks.length === 0 ? (
-                <div style={S.allGood}>
-                  <div style={S.allGoodTitle}>NO BOTTLENECKS.</div>
-                  <div style={S.allGoodText}>All tracked stats at Good/Elite tier. Scale the spend.</div>
-                </div>
-              ) : (
-                <div style={S.bottleneckList}>
-                  {topBottlenecks.map((r, idx) => {
-                    const pb = PLAYBOOKS[r.key] || { substats: [], tests: [], warning: '' };
-                    const hasSolvePlan = !!SOLVE_PLANS[r.key];
-                    return (
-                      <div key={r.key} style={S.bnCard}>
-                        <div style={S.bnTop}>
-                          <div style={S.bnRank}>#{idx + 1}</div>
-                          <div style={S.bnInfo}>
-                            <div style={S.bnTitle}>{r.label}</div>
-                            <div style={S.bnMeta}>
-                              <span style={{ color: TIER_COLORS[r.tier] }}>{formatNumber(r.value, r.bench.format)}{r.bench.format === '%' ? '%' : r.bench.format === 'x' ? 'x' : ''} · {r.tier.toUpperCase()}</span>
-                              <span style={S.bnMetaDivider}>|</span>
-                              <span>TARGET: {r.bench.inverse ? `<${r.bench.good}` : `${r.bench.good}+`}{r.bench.format === '%' ? '%' : r.bench.format === 'x' ? 'x' : ''}</span>
-                              <span style={S.bnMetaDivider}>|</span>
-                              <span>SCORE: {r.priorityScore.toFixed(1)}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div style={S.bnBody}>
-                          <div style={S.bnCol}>
-                            <div style={S.bnColLabel}>INVESTIGATE</div>
-                            {pb.substats.map((s, i) => <div key={i} style={S.bnItem}>· {s}</div>)}
-                          </div>
-                          <div style={S.bnCol}>
-                            <div style={S.bnColLabel}>TEST THIS WEEK</div>
-                            {pb.tests.map((t, i) => <div key={i} style={S.bnItem}>→ {t}</div>)}
-                          </div>
-                        </div>
-                        {pb.warning && (
-                          <div style={S.bnWarning}>
-                            <span style={S.bnWarningLabel}>RISK:</span> {pb.warning}
-                          </div>
-                        )}
-                        {hasSolvePlan && (
-                          <button onClick={() => setSolvingBottleneck(r.key)} style={S.solveBtn}>
-                            SOLVE THIS BOTTLENECK →
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-
-      <div style={S.footer}>
-        <span style={S.footerText}>ONE STAT AT A TIME · ATTACK #1 UNTIL FIXED · THEN MOVE TO #2</span>
-      </div>
-    </div>
-  );
+function formatNumber(val, format) {
+  if (!val) return '';
+  const n = parseFloat(val);
+  if (format === '' && n >= 1000) return n >= 1000000 ? (n / 1000000).toFixed(1) + 'M' : (n / 1000).toFixed(1) + 'K';
+  return val;
 }
 
-const css = `
-  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-  @keyframes slideDown { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-  @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes modalSlideIn { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Archivo:wght@400;600;700;800;900&display=swap');
-  input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  input[type="number"] { -moz-appearance: textfield; }
-`;
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[s]);
+}
 
-const S = {
-  root: { minHeight: '100vh', background: '#0a0a0a', color: '#f0f0f0', fontFamily: "'Archivo', -apple-system, sans-serif", display: 'flex', flexDirection: 'column' },
-  topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 24px', borderBottom: '1px solid #1a1a1a', background: '#0d0d0d', flexWrap: 'wrap', gap: '12px' },
-  brand: { display: 'flex', alignItems: 'center', gap: '10px', fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em' },
-  brandMark: { background: '#00ffc2', color: '#000', padding: '4px 10px', fontWeight: 900, borderRadius: '999px' },
-  brandDot: { color: '#00ffc2', animation: 'pulse 2s infinite' },
-  brandText: { color: '#888' },
-  statusBar: { display: 'flex', alignItems: 'center', gap: '8px', fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', color: '#888', letterSpacing: '0.08em', padding: '6px 14px', background: '#1a1a1a', borderRadius: '999px' },
-  statusDot: { width: '7px', height: '7px', background: '#00ffc2', borderRadius: '50%', animation: 'pulse 2s infinite' },
-  funnelBar: { display: 'flex', gap: '24px', padding: '12px 24px', background: '#0d0d0d', borderBottom: '1px solid #1a1a1a', flexWrap: 'wrap', alignItems: 'center' },
-  funnelGroup: { display: 'flex', alignItems: 'center', gap: '10px' },
-  funnelGroupLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', fontWeight: 800, color: '#555', letterSpacing: '0.15em' },
-  funnelTabs: { display: 'flex', gap: '4px' },
-  tab: { background: '#1a1a1a', border: 'none', color: '#888', padding: '7px 16px', fontSize: '10px', fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.08em', cursor: 'pointer', transition: 'all 0.12s', whiteSpace: 'nowrap', borderRadius: '999px' },
-  tabActive: { background: '#00ffc2', color: '#000' },
-  mainGrid: { display: 'grid', gridTemplateColumns: 'minmax(380px, 460px) 1fr', gap: '1px', background: '#1a1a1a', flex: 1, minHeight: 0 },
-  leftPanel: { background: '#0a0a0a', padding: '16px 20px', overflowY: 'auto' },
-  rightPanel: { background: '#0a0a0a', padding: '16px 24px', overflowY: 'auto' },
-  panelHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid #1a1a1a' },
-  panelLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 700, letterSpacing: '0.15em', color: '#00ffc2' },
-  panelSubLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#555', letterSpacing: '0.08em' },
-  resetBtn: { background: 'transparent', color: '#666', border: '1px solid #2a2a2a', padding: '5px 14px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', fontFamily: "'JetBrains Mono', monospace", cursor: 'pointer', borderRadius: '999px' },
-  helpHint: { display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 14px', background: '#0f0f0f', border: '1px solid #1f1f1f', fontSize: '11px', color: '#888', marginBottom: '12px', lineHeight: 1.4, borderRadius: '999px' },
-  helpIconInline: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', background: '#1a1a1a', color: '#00ffc2', borderRadius: '50%', fontSize: '10px', fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", margin: '0 2px' },
-  inputList: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  inputRowWrapper: { borderBottom: '1px solid #141414' },
-  inputRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', gap: '12px' },
-  inputRowLeft: { flex: 1, minWidth: 0 },
-  inputLabelWrap: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' },
-  inputLabel: { fontSize: '13px', fontWeight: 600, color: '#e0e0e0' },
-  helpIcon: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', background: '#1a1a1a', color: '#666', border: 'none', borderRadius: '50%', fontSize: '10px', fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", cursor: 'pointer', transition: 'all 0.12s', padding: 0 },
-  helpIconActive: { background: '#00ffc2', color: '#000' },
-  inputBench: { fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', color: '#7cff6b', letterSpacing: '0.05em' },
-  inputRight: { display: 'flex', alignItems: 'center', gap: '6px' },
-  inputWrap: { position: 'relative', width: '100px' },
-  input: { width: '100%', background: '#050505', border: '1px solid #2a2a2a', color: '#f0f0f0', padding: '8px 24px 8px 14px', fontSize: '14px', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.15s', borderRadius: '999px' },
-  inputPrefix: { position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#555', fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', pointerEvents: 'none' },
-  inputSuffix: { position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#555', fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', pointerEvents: 'none' },
-  tierPill: { padding: '4px 10px', fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', fontWeight: 800, letterSpacing: '0.08em', minWidth: '40px', textAlign: 'center', borderRadius: '999px' },
-  helpPanel: { background: '#0a0a0a', border: '1px solid #00ffc2', padding: '14px 16px', marginBottom: '8px', animation: 'slideDown 0.18s ease-out', borderRadius: '16px' },
-  helpSection: { marginBottom: '10px' },
-  helpSectionLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', fontWeight: 700, color: '#00ffc2', letterSpacing: '0.12em', marginBottom: '4px' },
-  helpFormula: { fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', color: '#f0f0f0', fontWeight: 600, padding: '8px 12px', background: '#050505', border: '1px solid #1a1a1a', borderRadius: '999px' },
-  helpText: { fontSize: '11px', color: '#aaa', lineHeight: 1.5 },
-  calcSection: { marginTop: '8px', paddingTop: '10px', borderTop: '1px dashed #1f1f1f' },
-  calcFields: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' },
-  calcField: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  calcLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', color: '#888', letterSpacing: '0.05em' },
-  calcInputWrap: { position: 'relative' },
-  calcInput: { width: '100%', background: '#050505', border: '1px solid #2a2a2a', color: '#f0f0f0', padding: '7px 12px', fontSize: '12px', fontFamily: "'JetBrains Mono', monospace", fontWeight: 600, outline: 'none', boxSizing: 'border-box', borderRadius: '999px' },
-  calcPrefix: { position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#555', fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', pointerEvents: 'none' },
-  calcResult: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', background: '#0a1512', border: '1px solid #00ffc2', borderRadius: '999px' },
-  calcResultLabel: { color: '#00ffc2', fontWeight: 900, fontFamily: "'JetBrains Mono', monospace", fontSize: '14px' },
-  calcResultValue: { fontFamily: "'JetBrains Mono', monospace", fontSize: '14px', fontWeight: 800, color: '#f0f0f0', flex: 1 },
-  applyBtn: { background: '#00ffc2', color: '#000', border: 'none', padding: '6px 14px', fontSize: '10px', fontWeight: 800, letterSpacing: '0.08em', fontFamily: "'JetBrains Mono', monospace", cursor: 'pointer', borderRadius: '999px' },
-  emptyState: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '400px', color: '#666' },
-  emptyMark: { fontSize: '64px', color: '#00ffc2', fontWeight: 900, lineHeight: 1, marginBottom: '20px', opacity: 0.3 },
-  emptyTitle: { fontFamily: "'JetBrains Mono', monospace", fontSize: '14px', fontWeight: 700, letterSpacing: '0.15em', color: '#888', marginBottom: '10px' },
-  emptyText: { fontSize: '13px', color: '#555', maxWidth: '340px', textAlign: 'center', lineHeight: 1.5 },
-  scorecard: { display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '20px' },
-  scoreRow: { display: 'grid', gridTemplateColumns: '150px 1fr 70px', gap: '12px', alignItems: 'center', padding: '6px 0' },
-  scoreLabel: { fontSize: '12px', color: '#ccc', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  scoreBarWrap: { height: '6px', background: '#1a1a1a', overflow: 'hidden', borderRadius: '999px' },
-  scoreBarFill: { height: '100%', transition: 'width 0.35s ease-out', borderRadius: '999px' },
-  scoreValue: { fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', fontWeight: 700, color: '#f0f0f0', textAlign: 'right' },
-  bottleneckList: { display: 'flex', flexDirection: 'column', gap: '10px' },
-  bnCard: { background: '#0f0f0f', border: '1px solid #2a2a2a', borderRadius: '16px', overflow: 'hidden' },
-  bnTop: { display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderBottom: '1px solid #1a1a1a' },
-  bnRank: { fontFamily: "'JetBrains Mono', monospace", fontSize: '28px', fontWeight: 900, color: '#00ffc2', lineHeight: 1 },
-  bnInfo: { flex: 1 },
-  bnTitle: { fontSize: '16px', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '-0.01em' },
-  bnMeta: { display: 'flex', gap: '8px', flexWrap: 'wrap', fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#888', letterSpacing: '0.04em', alignItems: 'center' },
-  bnMetaDivider: { color: '#333' },
-  bnBody: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', padding: '12px 16px' },
-  bnCol: { minWidth: 0 },
-  bnColLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', fontWeight: 700, color: '#00ffc2', letterSpacing: '0.12em', marginBottom: '8px' },
-  bnItem: { fontSize: '12px', color: '#ccc', padding: '3px 0', lineHeight: 1.4 },
-  bnWarning: { background: '#1a0d00', borderTop: '1px solid #ff7a00', padding: '8px 16px', fontSize: '11px', color: '#ffb870', lineHeight: 1.4 },
-  bnWarningLabel: { color: '#ff7a00', fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.08em', marginRight: '4px' },
-  solveBtn: { display: 'block', width: '100%', background: '#00ffc2', color: '#000', border: 'none', padding: '14px 16px', fontSize: '12px', fontWeight: 900, letterSpacing: '0.1em', fontFamily: "'JetBrains Mono', monospace", cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center' },
-  allGood: { background: '#0a1512', border: '1px solid #00ffc2', padding: '24px', textAlign: 'center', borderRadius: '16px' },
-  allGoodTitle: { fontSize: '16px', fontWeight: 900, color: '#00ffc2', marginBottom: '6px', letterSpacing: '0.02em' },
-  allGoodText: { fontSize: '12px', color: '#aaa' },
-  footer: { padding: '10px 24px', borderTop: '1px solid #1a1a1a', background: '#0d0d0d', textAlign: 'center' },
-  footerText: { fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 700, color: '#00ffc2', letterSpacing: '0.15em' },
-
-  // MODAL STYLES
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', animation: 'modalFadeIn 0.2s ease-out' },
-  modalContainer: { background: '#0a0a0a', border: '1px solid #00ffc2', borderRadius: '20px', maxWidth: '900px', width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', animation: 'modalSlideIn 0.25s ease-out', overflow: 'hidden' },
-  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '24px 28px', borderBottom: '1px solid #1a1a1a', background: '#0d0d0d' },
-  modalLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 700, color: '#00ffc2', letterSpacing: '0.2em', marginBottom: '6px' },
-  modalTitle: { fontSize: '28px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.02em', marginBottom: '8px', lineHeight: 1 },
-  modalMeta: { display: 'flex', gap: '10px', alignItems: 'center', fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', letterSpacing: '0.05em', flexWrap: 'wrap' },
-  modalDivider: { color: '#444' },
-  modalClose: { background: '#1a1a1a', color: '#888', border: 'none', width: '36px', height: '36px', borderRadius: '50%', fontSize: '14px', cursor: 'pointer', fontWeight: 700, transition: 'all 0.15s' },
-  modalBody: { padding: '24px 28px', overflowY: 'auto', flex: 1 },
-  blockLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 700, color: '#00ffc2', letterSpacing: '0.15em', marginBottom: '12px' },
-  diagnosisBlock: { marginBottom: '24px' },
-  diagnosisText: { fontSize: '15px', color: '#e0e0e0', lineHeight: 1.6, marginBottom: '12px' },
-  sopRef: { fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#7cff6b', padding: '6px 12px', background: '#0a1512', border: '1px solid #1a2a22', borderRadius: '999px', display: 'inline-block', letterSpacing: '0.05em' },
-  rootCausesBlock: { marginBottom: '24px', padding: '16px 18px', background: '#0d0d0d', border: '1px solid #1f1f1f', borderRadius: '16px' },
-  rootCauseRow: { padding: '10px 0', borderBottom: '1px solid #1a1a1a' },
-  rootCauseName: { fontSize: '13px', fontWeight: 700, color: '#f0f0f0', marginBottom: '3px' },
-  rootCauseSignal: { fontSize: '12px', color: '#888', fontStyle: 'italic' },
-  phasesBlock: { marginBottom: '24px' },
-  phaseCard: { background: '#0d0d0d', border: '1px solid #2a2a2a', borderRadius: '16px', marginBottom: '12px', overflow: 'hidden' },
-  phaseHeader: { display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 18px', background: '#0f1a16', borderBottom: '1px solid #1a2a22' },
-  phaseNumber: { width: '32px', height: '32px', background: '#00ffc2', color: '#000', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '14px', fontFamily: "'JetBrains Mono', monospace" },
-  phaseName: { fontSize: '14px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#e0e0e0' },
-  phaseActions: { padding: '14px 18px' },
-  phaseAction: { display: 'flex', gap: '10px', padding: '6px 0', fontSize: '13px', color: '#d0d0d0', lineHeight: 1.5 },
-  phaseBullet: { color: '#00ffc2', fontWeight: 700, flexShrink: 0 },
-  footerBlock: { paddingTop: '16px', borderTop: '1px solid #1a1a1a' },
-  footerRow: { marginBottom: '14px' },
-  footerCol: {},
-  footerColLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 700, color: '#00ffc2', letterSpacing: '0.12em', marginBottom: '8px' },
-  toolsList: { display: 'flex', flexWrap: 'wrap', gap: '6px' },
-  toolPill: { padding: '4px 12px', background: '#1a1a1a', color: '#ccc', fontSize: '10px', fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.05em', borderRadius: '999px', border: '1px solid #2a2a2a' },
-  expectedLift: { padding: '12px 16px', background: '#0a1512', border: '1px solid #00ffc2', borderRadius: '12px', fontSize: '13px', color: '#f0f0f0', lineHeight: 1.5 },
-  liftLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 800, color: '#00ffc2', letterSpacing: '0.1em', marginRight: '6px' },
+// ============ STATE ============
+const state = {
+  funnelType: 'webinar',
+  inputs: {},
+  expandedStat: null,
+  calcValues: {},
+  solvingBottleneck: null,
 };
+
+// ============ RENDER ============
+function render() {
+  const benchmarks = BENCHMARKS[state.funnelType];
+  const statKeys = Object.keys(benchmarks);
+  const filledCount = statKeys.filter(k => state.inputs[k] !== undefined && state.inputs[k] !== '').length;
+  const hasData = filledCount > 0;
+
+  // Run analysis
+  const analysis = statKeys.map(key => {
+    const val = state.inputs[key];
+    const bench = benchmarks[key];
+    const tier = getTier(val, bench);
+    const meta = STAT_META[key] || { ease: 3, risk: 3, impact: 3 };
+    const gap = tier ? TIER_GAPS[tier] : 0;
+    const priorityScore = gap > 0 ? (gap * meta.impact * meta.ease) / meta.risk : 0;
+    return { key, label: bench.label, value: val, tier, bench, meta, gap, priorityScore };
+  }).sort((a, b) => b.priorityScore - a.priorityScore);
+
+  const topBottlenecks = analysis.filter(r => r.priorityScore > 0).slice(0, 3);
+
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    ${renderModal()}
+    <div class="topBar">
+      <div class="brand">
+        <span class="brandMark">T5</span>
+        <span class="brandDot">●</span>
+        <span class="brandText">BOTTLENECK.ANALYZER</span>
+      </div>
+      <div class="statusBar">
+        <span class="statusDot"></span>
+        <span>${filledCount}/${statKeys.length} STATS</span>
+      </div>
+    </div>
+
+    <div class="funnelBar">
+      ${Object.entries(FUNNEL_CATEGORIES).map(([catKey, cat]) => `
+        <div class="funnelGroup">
+          <span class="funnelGroupLabel">${cat.label}</span>
+          <div class="funnelTabs">
+            ${cat.funnels.map(f => `
+              <button class="tab ${state.funnelType === f.id ? 'active' : ''}" data-funnel="${f.id}">${f.name}</button>
+            `).join('')}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="mainGrid">
+      <div class="leftPanel">
+        <div class="panelHeader">
+          <span class="panelLabel">INPUT STATS</span>
+          ${hasData ? '<button class="resetBtn" data-action="reset">RESET</button>' : ''}
+        </div>
+        <div class="helpHint">
+          <span>Click </span><span class="helpIconInline">?</span><span> on any stat to see the formula + calculator</span>
+        </div>
+        <div class="inputList">
+          ${statKeys.map(key => renderInputRow(key, benchmarks[key])).join('')}
+        </div>
+      </div>
+
+      <div class="rightPanel">
+        ${!hasData ? renderEmptyState() : renderResults(analysis, topBottlenecks, statKeys, filledCount)}
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="footerText">ONE STAT AT A TIME · ATTACK #1 UNTIL FIXED · THEN MOVE TO #2</span>
+    </div>
+  `;
+
+  attachListeners();
+}
+
+function renderInputRow(key, bench) {
+  const val = state.inputs[key] || '';
+  const tier = getTier(val, bench);
+  const formula = FORMULAS[key];
+  const calculator = CALCULATORS[key];
+  const isExpanded = state.expandedStat === key;
+  const cv = state.calcValues[key] || {};
+  const calcResult = calculator ? calculator.calc(cv) : 0;
+
+  const borderColor = tier ? TIER_COLORS[tier] : '#2a2a2a';
+  const paddingLeft = bench.format === '$' ? '22px' : '14px';
+
+  return `
+    <div class="inputRowWrapper">
+      <div class="inputRow">
+        <div class="inputRowLeft">
+          <div class="inputLabelWrap">
+            <span class="inputLabel">${escapeHtml(bench.label)}</span>
+            ${formula ? `<button class="helpIcon ${isExpanded ? 'active' : ''}" data-help="${key}" title="Show formula & calculator">?</button>` : ''}
+          </div>
+          <div class="inputBench">GOOD: ${bench.inverse ? '&lt;' + bench.good : bench.good + '+'}${bench.format}</div>
+        </div>
+        <div class="inputRight">
+          <div class="inputWrap">
+            ${bench.format === '$' ? '<span class="inputPrefix">$</span>' : ''}
+            <input type="number" step="0.01" value="${val}" data-input="${key}" placeholder="—" class="input" style="padding-left: ${paddingLeft}; border-color: ${borderColor};">
+            ${(bench.format === '%' || bench.format === 'x') ? `<span class="inputSuffix">${bench.format}</span>` : ''}
+          </div>
+          ${tier ? `<div class="tierPill" style="background: ${TIER_COLORS[tier]};">${tier.toUpperCase().slice(0, 4)}</div>` : ''}
+        </div>
+      </div>
+      ${isExpanded && formula ? renderHelpPanel(key, formula, calculator, cv, calcResult, bench) : ''}
+    </div>
+  `;
+}
+
+function renderHelpPanel(key, formula, calculator, cv, calcResult, bench) {
+  return `
+    <div class="helpPanel">
+      <div class="helpSection">
+        <div class="helpSectionLabel">FORMULA</div>
+        <div class="helpFormula">${escapeHtml(formula.formula)}</div>
+      </div>
+      <div class="helpSection">
+        <div class="helpSectionLabel">WHERE TO FIND</div>
+        <div class="helpText">${escapeHtml(formula.where)}</div>
+      </div>
+      ${formula.note ? `
+        <div class="helpSection">
+          <div class="helpSectionLabel">NOTE</div>
+          <div class="helpText">${escapeHtml(formula.note)}</div>
+        </div>
+      ` : ''}
+      ${calculator ? `
+        <div class="calcSection">
+          <div class="helpSectionLabel">CALCULATE IT</div>
+          <div class="calcFields">
+            ${calculator.fields.map(f => `
+              <div class="calcField">
+                <label class="calcLabel">${escapeHtml(f.label)}</label>
+                <div class="calcInputWrap">
+                  ${f.prefix ? `<span class="calcPrefix">${f.prefix}</span>` : ''}
+                  <input type="number" step="0.01" value="${cv[f.key] || ''}" data-calc="${key}" data-field="${f.key}" placeholder="0" class="calcInput" style="padding-left: ${f.prefix ? '20px' : '10px'};">
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          ${calcResult > 0 ? `
+            <div class="calcResult">
+              <span class="calcResultLabel">=</span>
+              <span class="calcResultValue">${bench.format === '$' ? '$' : ''}${calcResult.toFixed(2)}${bench.format === '%' ? '%' : ''}${bench.format === 'x' ? 'x' : ''}</span>
+              <button class="applyBtn" data-apply="${key}">USE THIS →</button>
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderEmptyState() {
+  return `
+    <div class="emptyState">
+      <div class="emptyMark">→</div>
+      <div class="emptyTitle">PLUG IN YOUR STATS</div>
+      <div class="emptyText">Input your metrics on the left. Click the "?" icon for formulas and a built-in calculator if you need help finding a stat.</div>
+    </div>
+  `;
+}
+
+function renderResults(analysis, topBottlenecks, statKeys, filledCount) {
+  return `
+    <div class="panelHeader">
+      <span class="panelLabel">SCORECARD</span>
+      <span class="panelSubLabel">${filledCount} of ${statKeys.length} tracked</span>
+    </div>
+    <div class="scorecard">
+      ${analysis.filter(r => r.tier).map(r => `
+        <div class="scoreRow">
+          <div class="scoreLabel">${escapeHtml(r.label)}</div>
+          <div class="scoreBarWrap">
+            <div class="scoreBarFill" style="width: ${Math.min(100, (1 - (r.gap / 4)) * 100)}%; background: ${TIER_COLORS[r.tier]};"></div>
+          </div>
+          <div class="scoreValue">${r.bench.format === '$' ? '$' : ''}${formatNumber(r.value, r.bench.format)}${r.bench.format === '%' ? '%' : ''}${r.bench.format === 'x' ? 'x' : ''}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="panelHeader" style="margin-top: 20px;">
+      <span class="panelLabel">ATTACK MODE · TOP BOTTLENECKS</span>
+    </div>
+
+    ${topBottlenecks.length === 0 ? `
+      <div class="allGood">
+        <div class="allGoodTitle">NO BOTTLENECKS.</div>
+        <div class="allGoodText">All tracked stats at Good/Elite tier. Scale the spend.</div>
+      </div>
+    ` : `
+      <div class="bottleneckList">
+        ${topBottlenecks.map((r, idx) => renderBottleneckCard(r, idx)).join('')}
+      </div>
+    `}
+  `;
+}
+
+function renderBottleneckCard(r, idx) {
+  const pb = PLAYBOOKS[r.key] || { substats: [], tests: [], warning: '' };
+  const hasSolvePlan = !!SOLVE_PLANS[r.key];
+
+  return `
+    <div class="bnCard">
+      <div class="bnTop">
+        <div class="bnRank">#${idx + 1}</div>
+        <div class="bnInfo">
+          <div class="bnTitle">${escapeHtml(r.label)}</div>
+          <div class="bnMeta">
+            <span style="color: ${TIER_COLORS[r.tier]};">${formatNumber(r.value, r.bench.format)}${r.bench.format === '%' ? '%' : r.bench.format === 'x' ? 'x' : ''} · ${r.tier.toUpperCase()}</span>
+            <span class="bnMetaDivider">|</span>
+            <span>TARGET: ${r.bench.inverse ? '&lt;' + r.bench.good : r.bench.good + '+'}${r.bench.format === '%' ? '%' : r.bench.format === 'x' ? 'x' : ''}</span>
+            <span class="bnMetaDivider">|</span>
+            <span>SCORE: ${r.priorityScore.toFixed(1)}</span>
+          </div>
+        </div>
+      </div>
+      <div class="bnBody">
+        <div class="bnCol">
+          <div class="bnColLabel">INVESTIGATE</div>
+          ${pb.substats.map(s => `<div class="bnItem">· ${escapeHtml(s)}</div>`).join('')}
+        </div>
+        <div class="bnCol">
+          <div class="bnColLabel">TEST THIS WEEK</div>
+          ${pb.tests.map(t => `<div class="bnItem">→ ${escapeHtml(t)}</div>`).join('')}
+        </div>
+      </div>
+      ${pb.warning ? `
+        <div class="bnWarning">
+          <span class="bnWarningLabel">RISK:</span> ${escapeHtml(pb.warning)}
+        </div>
+      ` : ''}
+      ${hasSolvePlan ? `<button class="solveBtn" data-solve="${r.key}">SOLVE THIS BOTTLENECK →</button>` : ''}
+    </div>
+  `;
+}
+
+function renderModal() {
+  if (!state.solvingBottleneck) return '';
+
+  const benchmarks = BENCHMARKS[state.funnelType];
+  const val = state.inputs[state.solvingBottleneck];
+  const bench = benchmarks[state.solvingBottleneck];
+  if (!bench) return '';
+  const tier = getTier(val, bench);
+  const plan = SOLVE_PLANS[state.solvingBottleneck];
+  if (!plan) return '';
+
+  return `
+    <div class="modalOverlay" data-close-modal>
+      <div class="modalContainer" data-stop>
+        <div class="modalHeader">
+          <div>
+            <div class="modalLabel">SOLVING BOTTLENECK</div>
+            <div class="modalTitle">${escapeHtml(bench.label)}</div>
+            <div class="modalMeta">
+              <span style="color: ${TIER_COLORS[tier] || '#888'};">
+                ${val}${bench.format === '%' ? '%' : bench.format === 'x' ? 'x' : ''} · ${tier ? tier.toUpperCase() : 'N/A'}
+              </span>
+              <span class="modalDivider">→</span>
+              <span style="color: ${TIER_COLORS.good};">
+                TARGET: ${bench.inverse ? '&lt;' + bench.good : bench.good + '+'}${bench.format === '%' ? '%' : bench.format === 'x' ? 'x' : ''}
+              </span>
+            </div>
+          </div>
+          <button class="modalClose" data-close-modal>✕</button>
+        </div>
+        <div class="modalBody">
+          <div class="diagnosisBlock">
+            <div class="blockLabel">DIAGNOSIS</div>
+            <div class="diagnosisText">${escapeHtml(plan.diagnosis)}</div>
+            <div class="sopRef">REFERENCE: ${escapeHtml(plan.sopRef)}</div>
+          </div>
+
+          <div class="rootCausesBlock">
+            <div class="blockLabel">ROOT CAUSES · MATCH THE SIGNAL TO YOUR REALITY</div>
+            ${plan.rootCauses.map(rc => `
+              <div class="rootCauseRow">
+                <div class="rootCauseName">${escapeHtml(rc.cause)}</div>
+                <div class="rootCauseSignal">→ ${escapeHtml(rc.signal)}</div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="phasesBlock">
+            <div class="blockLabel">EXECUTION PLAN</div>
+            ${plan.phases.map((phase, i) => `
+              <div class="phaseCard">
+                <div class="phaseHeader">
+                  <div class="phaseNumber">${i + 1}</div>
+                  <div class="phaseName">${escapeHtml(phase.name)}</div>
+                </div>
+                <div class="phaseActions">
+                  ${phase.actions.map(action => `
+                    <div class="phaseAction">
+                      <span class="phaseBullet">→</span>
+                      <span>${escapeHtml(action)}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="footerBlock">
+            <div class="footerColLabel">TOOLS NEEDED</div>
+            <div class="toolsList">
+              ${plan.tools.map(t => `<span class="toolPill">${escapeHtml(t)}</span>`).join('')}
+            </div>
+            <div class="expectedLift">
+              <span class="liftLabel">EXPECTED LIFT:</span> ${escapeHtml(plan.expectedLift)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ============ EVENT HANDLERS ============
+function attachListeners() {
+  // Funnel tabs
+  document.querySelectorAll('[data-funnel]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.funnelType = btn.dataset.funnel;
+      state.inputs = {};
+      state.calcValues = {};
+      state.expandedStat = null;
+      render();
+    });
+  });
+
+  // Reset
+  document.querySelectorAll('[data-action="reset"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.inputs = {};
+      state.calcValues = {};
+      state.expandedStat = null;
+      render();
+    });
+  });
+
+  // Input changes
+  document.querySelectorAll('[data-input]').forEach(input => {
+    input.addEventListener('input', (e) => {
+      state.inputs[e.target.dataset.input] = e.target.value;
+      render();
+      // Restore focus
+      const restored = document.querySelector(`[data-input="${e.target.dataset.input}"]`);
+      if (restored) {
+        restored.focus();
+        const len = restored.value.length;
+        restored.setSelectionRange(len, len);
+      }
+    });
+  });
+
+  // Help toggle
+  document.querySelectorAll('[data-help]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.help;
+      state.expandedStat = state.expandedStat === key ? null : key;
+      render();
+    });
+  });
+
+  // Calculator inputs
+  document.querySelectorAll('[data-calc]').forEach(input => {
+    input.addEventListener('input', (e) => {
+      const statKey = e.target.dataset.calc;
+      const fieldKey = e.target.dataset.field;
+      if (!state.calcValues[statKey]) state.calcValues[statKey] = {};
+      state.calcValues[statKey][fieldKey] = parseFloat(e.target.value) || 0;
+      render();
+      const restored = document.querySelector(`[data-calc="${statKey}"][data-field="${fieldKey}"]`);
+      if (restored) {
+        restored.focus();
+        const len = restored.value.length;
+        restored.setSelectionRange(len, len);
+      }
+    });
+  });
+
+  // Apply calculated value
+  document.querySelectorAll('[data-apply]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.apply;
+      const calc = CALCULATORS[key];
+      if (!calc) return;
+      const result = calc.calc(state.calcValues[key] || {});
+      if (result > 0) {
+        state.inputs[key] = result.toFixed(2);
+        state.expandedStat = null;
+        render();
+      }
+    });
+  });
+
+  // Solve button
+  document.querySelectorAll('[data-solve]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.solvingBottleneck = btn.dataset.solve;
+      render();
+    });
+  });
+
+  // Close modal
+  document.querySelectorAll('[data-close-modal]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (e.target === el) {
+        state.solvingBottleneck = null;
+        render();
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-stop]').forEach(el => {
+    el.addEventListener('click', (e) => e.stopPropagation());
+  });
+}
+
+// ============ INIT ============
+render();
+</script>
+</body>
+</html>
